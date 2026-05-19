@@ -69,15 +69,14 @@
   getRedirectResult(auth).then(result => {
     if (result && result.user) {
       currentUser = result.user;
-      updateAuthUI(result.user);
-      loadFromCloud();
-      showToast('Signed in as ' + result.user.displayName + ' ☁️');
+      // Dispatch event so main JS can update UI once it's loaded
+      window.dispatchEvent(new CustomEvent('authChanged', { detail: result.user }));
+      window.dispatchEvent(new CustomEvent('redirectSignIn', { detail: result.user }));
     }
   }).catch(e => {
-    if (e.code !== 'auth/no-current-user') {
-      console.warn('Redirect result error:', e.message);
-    }
+    console.warn('Redirect result error:', e.code, e.message);
   });
+
 
   window.fbSignOut = async () => {
     if (!firebaseReady) return;
@@ -1484,7 +1483,17 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(usdaKey&&usdaKey!=='DEMO_KEY') document.getElementById('key-status').textContent='✓ Custom key active';
   renderAll();
 });
-window.addEventListener('authChanged',e=>{updateAuthUI(e.detail);});
+window.addEventListener('authChanged', e => {
+  updateAuthUI(e.detail);
+});
+
+// Handle coming back from Google redirect sign-in
+window.addEventListener('redirectSignIn', e => {
+  const user = e.detail;
+  updateAuthUI(user);
+  loadFromCloud();
+  setTimeout(() => showToast('Welcome back, ' + (user.displayName || 'Manju') + '! ☁️'), 500);
+});
 </script>
 </body>
 </html>
