@@ -328,6 +328,14 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 .date-nav-btn{background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text2);font-size:20px;line-height:1;border-radius:6px}
 .date-nav-btn:active{background:var(--border)}
 .repeat-meal-btn{display:flex;align-items:center;gap:6px;width:100%;padding:9px 14px;color:var(--teal);font-size:12px;font-family:'DM Sans',sans-serif;background:var(--teal-l);border:none;border-top:1px solid var(--border);cursor:pointer;font-weight:500}
+.vit-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.vit-row:last-child{border-bottom:none}
+.vit-check{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s;background:var(--bg2)}
+.vit-check.taken{background:var(--green);border-color:var(--green);color:white}
+.vit-info{flex:1;min-width:0}
+.vit-nm{font-size:13px;font-weight:600}
+.vit-detail{font-size:11px;color:var(--text2)}
+.vit-del{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;font-size:16px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -427,13 +435,23 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
     <!-- ══ NUTRIENTS ══ -->
     <div id="page-nutrients" class="page">
       <div class="sec">
+
+        <!-- Vitamins & Supplements Log -->
+        <div class="card">
+          <div class="card-title">Vitamins & Supplements — today</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Tap to mark as taken</div>
+          <div id="vitamin-log-list"></div>
+          <button class="btn-secondary" style="margin-top:12px;font-size:12px" onclick="openModal('add-vitamin-modal')">+ Add supplement</button>
+        </div>
+
         <div class="card">
           <div class="card-title">Micronutrients — today</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Estimated from foods logged · updates as you eat</div>
           <div id="nutrient-list"></div>
-          <div class="tags-row"><span class="tag t-red">⚠ Low B12</span><span class="tag t-amb">Watch Iron</span><span class="tag t-grn">Good Calcium</span></div>
+          <div class="tags-row" id="nutrient-tags-row"></div>
         </div>
-        <div class="card"><div class="card-title">Amino acids</div><div id="amino-list"></div></div>
-        <div class="card"><div class="card-title">Fatty acids</div><div id="fat-list"></div></div>
+        <div class="card"><div class="card-title">Amino acids <span style="font-size:11px;font-weight:400;color:var(--text3)">— scales with protein intake</span></div><div id="amino-list"></div></div>
+        <div class="card"><div class="card-title">Fatty acids <span style="font-size:11px;font-weight:400;color:var(--text3)">— scales with fat intake</span></div><div id="fat-list"></div></div>
         <div class="card">
           <div class="card-title">Vegan essentials</div>
           <div class="insight-item"><div class="ins-icon" style="background:var(--red-l)"><i class="ti ti-pill" style="color:var(--red)"></i></div><div><div class="ins-title">Vitamin B12</div><div class="ins-sub">Supplement 2.4 mcg/day. Fortified nutritional yeast, plant milk.</div></div></div>
@@ -441,6 +459,29 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
           <div class="insight-item"><div class="ins-icon" style="background:var(--teal-l)"><i class="ti ti-sun" style="color:var(--teal)"></i></div><div><div class="ins-title">Vitamin D</div><div class="ins-sub">Chicago winters: 1,000–2,000 IU lichen-based D3 supplement.</div></div></div>
           <div class="insight-item" style="border:none"><div class="ins-icon" style="background:var(--purple-l)"><i class="ti ti-bolt" style="color:var(--purple)"></i></div><div><div class="ins-title">Iron absorption</div><div class="ins-sub">Pair lentils/spinach with Vitamin C (lemon, amla) to boost non-heme iron.</div></div></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Add Vitamin Modal -->
+    <div class="modal-overlay" id="add-vitamin-modal">
+      <div class="modal">
+        <button class="modal-close" onclick="closeModal('add-vitamin-modal')">×</button>
+        <div class="modal-title">Add Supplement</div>
+        <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="vit-name" placeholder="e.g. Vitamin B12"></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Dose</label><input class="form-input" id="vit-dose" placeholder="e.g. 1000"></div>
+          <div class="form-group"><label class="form-label">Unit</label>
+            <select class="form-input" id="vit-unit">
+              <option>mcg</option><option>mg</option><option>IU</option><option>g</option><option>tablet</option><option>capsule</option><option>ml</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Timing</label>
+          <select class="form-input" id="vit-timing">
+            <option>Morning</option><option>With breakfast</option><option>With lunch</option><option>With dinner</option><option>Evening</option><option>Bedtime</option><option>Any time</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="saveVitamin()">Add supplement</button>
       </div>
     </div>
 
@@ -471,7 +512,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
             <div class="spinner" id="search-spinner" style="display:none"></div>
           </div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:10px">
-            <span class="src-usda">USDA</span> lab-verified · <span class="src-off">Open Food Facts</span> global · <span class="src-local">Built-in</span> Indian vegan
+            <span class="src-usda">USDA</span> ingredients · <span class="src-usda">USDA Branded</span> 400k+ brands · <span class="src-off">Open Food Facts</span> global · <span class="src-local">Built-in</span> Indian vegan
           </div>
           <div id="search-results"></div>
         </div>
@@ -976,6 +1017,9 @@ function loadDateView(date){
     nextBtn.disabled = atToday;
   }
 
+  // Load vitamin log for this specific date
+  vitaminLog = ls('mnj_vitlog_'+viewDate, {});
+
   renderAll();
 }
 
@@ -1414,6 +1458,91 @@ function renderWeightCard(){
 function renderWeightHistory(){renderWeightCard();}
 
 // ════════════════════════════════════════
+// VITAMINS & SUPPLEMENTS LOG
+// ════════════════════════════════════════
+
+// Default supplements for a vegan woman in Chicago
+const DEFAULT_VITAMINS = [
+  {id:'b12',  name:'Vitamin B12',  dose:'1000', unit:'mcg', timing:'Morning'},
+  {id:'d3',   name:'Vitamin D3',   dose:'2000', unit:'IU',  timing:'With breakfast'},
+  {id:'om3',  name:'Omega-3 (Algae DHA/EPA)', dose:'250', unit:'mg', timing:'With breakfast'},
+  {id:'iron', name:'Iron',         dose:'18',   unit:'mg',  timing:'With lunch'},
+  {id:'iod',  name:'Iodine',       dose:'150',  unit:'mcg', timing:'Morning'},
+];
+
+let vitamins     = ls('mnj_vitamins', DEFAULT_VITAMINS);    // user's supplement list
+let vitaminLog   = ls('mnj_vitlog_'+TODAY, {});             // today's taken status {id: true/false}
+
+function saveVitaminData(){
+  lsSet('mnj_vitamins', vitamins);
+  lsSet('mnj_vitlog_'+viewDate, vitaminLog);
+  if(typeof saveToCloud==='function'){
+    saveToCloud('meta/vitamins', {list: vitamins});
+    saveToCloud('diary/'+viewDate+'/vitlog', vitaminLog);
+  }
+}
+
+function renderVitaminLog(){
+  const el = document.getElementById('vitamin-log-list');
+  if(!el) return;
+  if(!vitamins.length){
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">No supplements added yet.</div>';
+    return;
+  }
+  const taken = vitamins.filter(v=>vitaminLog[v.id]).length;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:12px;color:var(--text2)">${taken} of ${vitamins.length} taken today</span>
+      <div style="height:6px;flex:1;max-width:120px;margin-left:10px;background:var(--border);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${vitamins.length?Math.round(taken/vitamins.length*100):0}%;background:var(--green);border-radius:99px;transition:width .3s"></div>
+      </div>
+    </div>
+    ${vitamins.map(v=>{
+      const isTaken = !!vitaminLog[v.id];
+      return `<div class="vit-row">
+        <div class="vit-check ${isTaken?'taken':''}" onclick="toggleVitamin('${v.id}')">
+          ${isTaken?'<i class="ti ti-check" style="font-size:14px"></i>':''}
+        </div>
+        <div class="vit-info">
+          <div class="vit-nm">${v.name}</div>
+          <div class="vit-detail">${v.dose} ${v.unit} · ${v.timing}${isTaken?' · <span style="color:var(--green)">✓ Taken</span>':''}</div>
+        </div>
+        <button class="vit-del" onclick="deleteVitamin('${v.id}')" title="Remove">×</button>
+      </div>`;
+    }).join('')}`;
+}
+
+function toggleVitamin(id){
+  vitaminLog[id] = !vitaminLog[id];
+  saveVitaminData();
+  renderVitaminLog();
+  const v = vitamins.find(x=>x.id===id);
+  if(v) showToast(vitaminLog[id] ? v.name+' ✓ taken' : v.name+' unmarked');
+}
+
+function saveVitamin(){
+  const name   = document.getElementById('vit-name').value.trim();
+  const dose   = document.getElementById('vit-dose').value.trim();
+  const unit   = document.getElementById('vit-unit').value;
+  const timing = document.getElementById('vit-timing').value;
+  if(!name){ showToast('Enter supplement name'); return; }
+  const id = 'v_'+Date.now();
+  vitamins.push({id, name, dose, unit, timing});
+  saveVitaminData();
+  renderVitaminLog();
+  closeModal('add-vitamin-modal');
+  ['vit-name','vit-dose'].forEach(i=>document.getElementById(i).value='');
+  showToast(name+' added');
+}
+
+function deleteVitamin(id){
+  vitamins = vitamins.filter(v=>v.id!==id);
+  delete vitaminLog[id];
+  saveVitaminData();
+  renderVitaminLog();
+}
+
+// ════════════════════════════════════════
 // NUTRIENTS — dynamic from logged foods
 // ════════════════════════════════════════
 
@@ -1499,6 +1628,19 @@ function renderNutrients(){
     const label = eaten===0 ? '0%' : pct+'%';
     return `<div class="nut-row"><div class="nut-nm">${n.name}</div><div class="nut-bar"><div class="nut-fill" style="width:${bar}%;background:${n.color}"></div></div><div class="nut-pct">${label}</div></div>`;
   }).join('');
+
+  // Dynamic tags
+  const tagsRow = document.getElementById('nutrient-tags-row');
+  if(tagsRow){
+    const low = nutrients.filter(n=>estimateNutrientPct(n.key)<50);
+    const good = nutrients.filter(n=>estimateNutrientPct(n.key)>=90);
+    tagsRow.innerHTML = [
+      ...low.map(n=>`<span class="tag t-red">⚠ Low ${n.name}</span>`),
+      ...good.slice(0,2).map(n=>`<span class="tag t-grn">✓ ${n.name}</span>`)
+    ].join('');
+  }
+
+  renderVitaminLog();
 
   // Aminos scale with protein intake
   const pRatio = Math.min(totalP() / targets.p, 1);
@@ -1634,34 +1776,56 @@ function onSearchInput(){
   clearTimeout(searchTimer);
   const q=document.getElementById('search-input').value.trim();
   if(!q){renderLocalFoods(activeCat);return;}
-  searchTimer=setTimeout(()=>doSearch(q),500);
+  searchTimer=setTimeout(()=>doSearch(q),400);
 }
 async function doSearch(q){
-  document.getElementById('search-spinner').style.display='inline-block';
-  const local=[...customFoods.map(f=>({...f,src:'local'})),...LOCAL_FOODS].filter(f=>f.name.toLowerCase().includes(q.toLowerCase())&&(activeCat==='all'||f.cat===activeCat));
-  const [usda,off]=await Promise.all([searchUSDA(q),searchOFF(q)]);
-  document.getElementById('search-spinner').style.display='none';
-  renderResults(dedup([...local,...usda,...off]));
+  const sp=document.getElementById('search-spinner');
+  sp.style.display='inline-block';
+  const local=[...customFoods.map(f=>({...f,src:'local'})),...LOCAL_FOODS]
+    .filter(f=>f.name.toLowerCase().includes(q.toLowerCase())&&(activeCat==='all'||f.cat===activeCat));
+  const [usda, branded, off] = await Promise.all([searchUSDA(q), searchUSDABranded(q), searchOFF(q)]);
+  sp.style.display='none';
+  const combined = dedup([...local, ...usda, ...branded, ...off]);
+  combined.sort((a,b)=>{
+    if(a.src==='local'&&b.src!=='local') return -1;
+    if(b.src==='local'&&a.src!=='local') return  1;
+    return a.name.length - b.name.length;
+  });
+  renderResults(combined);
 }
-function dedup(arr){const s=new Set();return arr.filter(f=>{const k=f.name.toLowerCase().slice(0,28);if(s.has(k))return false;s.add(k);return true;});}
+function dedup(arr){
+  const s=new Set();
+  return arr.filter(f=>{
+    if(!f.name||!f.cal) return false;
+    const k=f.name.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,32);
+    if(s.has(k)) return false;
+    s.add(k); return true;
+  });
+}
 function renderLocalFoods(cat){
   const list=[...customFoods.map(f=>({...f,src:'local'})),...LOCAL_FOODS].filter(f=>cat==='all'||f.cat===cat);
   renderResults(list);
 }
 function renderResults(list){
   const el=document.getElementById('search-results');
-  if(!list.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No foods found</div>';return;}
-  el.innerHTML=list.slice(0,200).map(f=>`
-    <div class="sr-row">
+  if(!list.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No foods found — try different keywords or check spelling</div>';return;}
+  const srcLabel={usda:'USDA',branded:'USDA Branded',off:'Open Food Facts',local:'Built-in'};
+  const srcClass={usda:'src-usda',branded:'src-usda',off:'src-off',local:'src-local'};
+  el.innerHTML=list.slice(0,200).map(f=>{
+    const src=f.src||'local';
+    const badge=`<span class="${srcClass[src]||'src-local'}">${srcLabel[src]||src}</span>`;
+    const brand=f.brand?`<span style="color:var(--text3);font-size:11px"> · ${f.brand}</span>`:'';
+    return `<div class="sr-row">
       <div style="flex:1;min-width:0">
-        <div class="food-nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name} <span class="src-${f.src||'local'}">${f.src==='usda'?'USDA':f.src==='off'?'Open Food Facts':'Built-in'}</span></div>
-        <div class="food-dt">${f.unit} · P:${f.p}g C:${f.c}g F:${f.f}g</div>
+        <div class="food-nm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}${brand} ${badge}</div>
+        <div class="food-dt">${f.unit||'100g'} · P:${f.p||0}g C:${f.c||0}g F:${f.f||0}g</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:8px">
-        <span style="font-size:12px;color:var(--text2)">${f.cal}</span>
+        <span style="font-size:12px;color:var(--text2);font-weight:600">${f.cal}</span>
         <button class="pill" onclick='openConfirm(${JSON.stringify(f).replace(/'/g,"&#39;")})'>Add</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('')+(list.length>0?`<div style="text-align:center;padding:10px;font-size:11px;color:var(--text3)">${list.length} results</div>`:'');
 }
 function setCat(cat,btn){
   activeCat=cat;
@@ -1670,17 +1834,63 @@ function setCat(cat,btn){
   const q=document.getElementById('search-input').value.trim();
   if(q) doSearch(q); else renderLocalFoods(cat);
 }
-function getNutrient(nutrients,numbers){for(const n of numbers){const f=nutrients.find(x=>x.nutrientNumber===String(n)||x.number===String(n));if(f)return Math.round((f.value||f.amount||0)*10)/10;}return 0;}
+function getNutrient(nutrients,numbers){
+  for(const n of numbers){
+    const f=nutrients.find(x=>x.nutrientNumber===String(n)||x.number===String(n)||x.nutrientId===n);
+    if(f) return Math.round((f.value||f.amount||0)*10)/10;
+  }
+  return 0;
+}
 async function searchUSDA(q){
-  try{const url=`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${usdaKey}&query=${encodeURIComponent(q)}&dataType=SR%20Legacy,Foundation&pageSize=8`;
-  const r=await fetch(url,{headers:{'Content-Type':'application/json'}});if(!r.ok)return[];
-  const d=await r.json();
-  return(d.foods||[]).map(f=>({name:f.description,unit:(f.servingSize?(f.servingSize+' '+(f.servingSizeUnit||'g')):'100g'),cal:Math.round(getNutrient(f.foodNutrients,[1008,208])),p:Math.round(getNutrient(f.foodNutrients,[1003,203])),c:Math.round(getNutrient(f.foodNutrients,[1005,205])),f:Math.round(getNutrient(f.foodNutrients,[1004,204])),cat:'all',src:'usda'})).filter(f=>f.cal>0);}catch(e){return[];}}
+  try{
+    const url=`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${usdaKey}&query=${encodeURIComponent(q)}&dataType=SR%20Legacy,Foundation&pageSize=10&sortBy=score&sortOrder=desc`;
+    const r=await fetch(url);if(!r.ok)return[];
+    const d=await r.json();
+    return(d.foods||[]).map(f=>({
+      name:f.description,
+      unit:f.servingSize?(f.servingSize+' '+(f.servingSizeUnit||'g')):'100g',
+      cal:Math.round(getNutrient(f.foodNutrients,[1008,208])),
+      p:Math.round(getNutrient(f.foodNutrients,[1003,203])),
+      c:Math.round(getNutrient(f.foodNutrients,[1005,205])),
+      f:Math.round(getNutrient(f.foodNutrients,[1004,204])),
+      cat:'all',src:'usda'
+    })).filter(f=>f.cal>0);
+  }catch(e){return[];}
+}
+async function searchUSDABranded(q){
+  try{
+    const url=`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${usdaKey}&query=${encodeURIComponent(q)}&dataType=Branded&pageSize=20&sortBy=score&sortOrder=desc`;
+    const r=await fetch(url);if(!r.ok)return[];
+    const d=await r.json();
+    return(d.foods||[]).map(f=>({
+      name:f.description,
+      brand:f.brandOwner||f.brandName||'',
+      unit:f.servingSize?(f.servingSize+' '+(f.servingSizeUnit||'g')):'1 serving',
+      cal:Math.round(getNutrient(f.foodNutrients,[1008,208])),
+      p:Math.round(getNutrient(f.foodNutrients,[1003,203])),
+      c:Math.round(getNutrient(f.foodNutrients,[1005,205])),
+      f:Math.round(getNutrient(f.foodNutrients,[1004,204])),
+      cat:'all',src:'branded'
+    })).filter(f=>f.cal>0);
+  }catch(e){return[];}
+}
 async function searchOFF(q){
-  try{const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments,serving_size`;
-  const r=await fetch(url,{headers:{'User-Agent':'ManjuNutritionTracker/4.0'}});if(!r.ok)return[];
-  const d=await r.json();
-  return(d.products||[]).filter(p=>p.product_name&&p.nutriments?.['energy-kcal_100g']).map(p=>({name:p.product_name,unit:p.serving_size||'100g',cal:Math.round(p.nutriments['energy-kcal_serving']||p.nutriments['energy-kcal_100g']||0),p:Math.round(p.nutriments['proteins_serving']||p.nutriments['proteins_100g']||0),c:Math.round(p.nutriments['carbohydrates_serving']||p.nutriments['carbohydrates_100g']||0),f:Math.round(p.nutriments['fat_serving']||p.nutriments['fat_100g']||0),cat:'all',src:'off'})).filter(f=>f.cal>0);}catch(e){return[];}}
+  try{
+    const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=15&sort_by=unique_scans_n&fields=product_name,brands,nutriments,serving_size,serving_quantity`;
+    const r=await fetch(url,{headers:{'User-Agent':'ManjuNutritionTracker/4.0'}});if(!r.ok)return[];
+    const d=await r.json();
+    return(d.products||[])
+      .filter(p=>p.product_name&&p.nutriments&&(p.nutriments['energy-kcal_100g']||p.nutriments['energy-kcal_serving']))
+      .map(p=>{
+        const hasServing=p.serving_quantity||p.serving_size;
+        const cal=Math.round(hasServing?(p.nutriments['energy-kcal_serving']||p.nutriments['energy-kcal_100g']||0):(p.nutriments['energy-kcal_100g']||0));
+        const pro=Math.round(hasServing?(p.nutriments['proteins_serving']||p.nutriments['proteins_100g']||0):(p.nutriments['proteins_100g']||0));
+        const carb=Math.round(hasServing?(p.nutriments['carbohydrates_serving']||p.nutriments['carbohydrates_100g']||0):(p.nutriments['carbohydrates_100g']||0));
+        const fat=Math.round(hasServing?(p.nutriments['fat_serving']||p.nutriments['fat_100g']||0):(p.nutriments['fat_100g']||0));
+        return{name:p.product_name,brand:p.brands||'',unit:p.serving_size||(hasServing?p.serving_quantity+'g':'100g'),cal,p:pro,c:carb,f:fat,cat:'all',src:'off'};
+      }).filter(f=>f.cal>0);
+  }catch(e){return[];}
+}
 async function lookupOFFBarcode(code){
   try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,nutriments,serving_size`,{headers:{'User-Agent':'ManjuNutritionTracker/4.0'}});
   const d=await r.json();if(d.status!==1||!d.product)return null;
@@ -2199,6 +2409,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 function renderAll(){
   updateCalDisplay(); renderWater(); renderMeals(); renderNutrients();
   renderBodyMetrics(); renderWeightCard(); renderExercise(); renderRecipes(); renderTrends();
+  renderVitaminLog();
 }
 
 // ════════════════════════════════════════
