@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#ffffff">
@@ -176,7 +176,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
 .cloud-dot.error{background:var(--red-m)}
 .avatar{width:36px;height:36px;border-radius:50%;background:var(--green-l);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:var(--green);border:2px solid var(--green-p);cursor:pointer;overflow:hidden;flex-shrink:0}
 .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:90px}
+.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(90px + env(safe-area-inset-bottom))}
 .sec{padding:14px 14px 0}
 .card{background:var(--surface);border-radius:var(--r);border:1px solid var(--border);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
 .card-title{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;font-weight:500}
@@ -226,13 +226,13 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
 .nut-bar{flex:2;height:6px;background:var(--border);border-radius:99px;overflow:hidden}
 .nut-fill{height:100%;border-radius:99px}
 .nut-pct{font-size:12px;color:var(--text2);min-width:36px;text-align:right}
-.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0 20px;z-index:100}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--surface);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0 20px;padding-bottom:max(20px, env(safe-area-inset-bottom));z-index:100}
 .nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:4px 10px;font-family:'DM Sans',sans-serif}
 .nav-btn i{font-size:22px;color:var(--text3)}
 .nav-btn span{font-size:10px;color:var(--text3)}
 .nav-btn.active i,.nav-btn.active span{color:var(--green)}
 .nav-btn.active span{font-weight:600}
-.fab{position:fixed;bottom:72px;right:calc(50% - 215px + 14px);width:52px;height:52px;border-radius:50%;background:var(--green-m);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:101;box-shadow:0 4px 16px rgba(99,153,34,.4)}
+.fab{position:fixed;bottom:calc(72px + env(safe-area-inset-bottom));right:calc(50% - 215px + 14px);width:52px;height:52px;border-radius:50%;background:var(--green-m);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:101;box-shadow:0 4px 16px rgba(99,153,34,.4)}
 .fab i{color:#fff;font-size:24px}
 .page{display:none}.page.active{display:block}
 .search-box{display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:var(--rs);padding:10px 14px;border:1px solid var(--border);margin-bottom:10px}
@@ -381,7 +381,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
         <div class="card">
           <div class="card-title">Body metrics</div>
           <div class="metric-grid" id="body-snapshot">
-            <div class="metric-cell"><div class="metric-val" id="bm-weight">—</div><div class="metric-lbl">Weight (kg)</div></div>
+            <div class="metric-cell"><div class="metric-val" id="bm-weight">—</div><div class="metric-lbl">Weight (lbs)</div></div>
             <div class="metric-cell"><div class="metric-val" id="bm-bf">—</div><div class="metric-lbl">Body fat %</div></div>
             <div class="metric-cell"><div class="metric-val" id="bm-sleep">—</div><div class="metric-lbl">Sleep (hrs)</div></div>
             <div class="metric-cell"><div class="metric-val" id="bm-bmi">—</div><div class="metric-lbl">BMI</div></div>
@@ -656,16 +656,16 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
     <button class="modal-close" onclick="closeModal('metrics-modal')">×</button>
     <div class="modal-title">Log body metrics</div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Weight (kg)</label><input class="form-input" type="number" step="0.1" id="bm-wt" placeholder="62.5"></div>
+      <div class="form-group"><label class="form-label">Weight (lbs)</label><input class="form-input" type="number" step="0.1" id="bm-wt" placeholder="62.5"></div>
       <div class="form-group"><label class="form-label">Body fat %</label><input class="form-input" type="number" step="0.1" id="bm-bf-in" placeholder="28"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Waist (cm)</label><input class="form-input" type="number" step="0.5" id="bm-waist" placeholder="72"></div>
-      <div class="form-group"><label class="form-label">Hips (cm)</label><input class="form-input" type="number" step="0.5" id="bm-hips" placeholder="96"></div>
+      <div class="form-group"><label class="form-label">Waist (inches)</label><input class="form-input" type="number" step="0.5" id="bm-waist" placeholder="28"></div>
+      <div class="form-group"><label class="form-label">Hips (inches)</label><input class="form-input" type="number" step="0.5" id="bm-hips" placeholder="38"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Sleep last night (hrs)</label><input class="form-input" type="number" step="0.5" id="bm-sleep-in" placeholder="7.5"></div>
-      <div class="form-group"><label class="form-label">Height (cm) — once</label><input class="form-input" type="number" id="bm-height" placeholder="160"></div>
+      <div class="form-group"><label class="form-label">Height (inches) — once</label><input class="form-input" type="number" id="bm-height" placeholder="63"></div>
     </div>
     <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="bm-date"></div>
     <button class="btn-primary" onclick="saveBodyMetrics()">Save metrics</button>
@@ -693,7 +693,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
       <div class="form-group"><label class="form-label">Duration (min)</label><input class="form-input" type="number" id="ex-dur" placeholder="30"></div>
       <div class="form-group"><label class="form-label">Calories burned</label><input class="form-input" type="number" id="ex-burn-input" placeholder="auto"></div>
     </div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Auto-estimated for 58 kg</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Auto-estimated for 128 lbs body weight</div>
     <button class="btn-primary" onclick="logExercise()">Log exercise</button>
   </div>
 </div>
@@ -1079,10 +1079,11 @@ function saveBodyMetrics(){
 }
 function renderBodyMetrics(){
   const today=bodyMetrics[TODAY]||{};
-  const height=ls(HEIGHT_KEY,160);
+  const heightIn=ls(HEIGHT_KEY,63); // height in inches
   const wt=today.weight||(weightLog.length?weightLog[weightLog.length-1].w:null);
-  const bmi=wt&&height?Math.round(wt/((height/100)**2)*10)/10:null;
-  document.getElementById('bm-weight').textContent=wt||'—';
+  // BMI formula using lbs and inches: (weight_lbs / height_in^2) * 703
+  const bmi=wt&&heightIn?Math.round((wt/(heightIn**2))*703*10)/10:null;
+  document.getElementById('bm-weight').textContent=wt?wt+' lbs':'—';
   document.getElementById('bm-bf').textContent=today.bodyFat?today.bodyFat+'%':'—';
   document.getElementById('bm-sleep').textContent=today.sleep?today.sleep+'h':'—';
   document.getElementById('bm-bmi').textContent=bmi||'—';
