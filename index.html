@@ -15,7 +15,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
   import { getFirestore, doc, setDoc, getDoc, collection, getDocs, orderBy, query, limit }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -60,9 +60,24 @@
     if (!firebaseReady) { alert('Set up Firebase config first (More → Cloud Sync Setup)'); return; }
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      // Use redirect instead of popup — works on all browsers and GitHub Pages
+      await signInWithRedirect(auth, provider);
     } catch(e) { showToast('Sign-in failed: ' + e.message); }
   };
+
+  // Handle redirect result when user comes back after Google sign-in
+  getRedirectResult(auth).then(result => {
+    if (result && result.user) {
+      currentUser = result.user;
+      updateAuthUI(result.user);
+      loadFromCloud();
+      showToast('Signed in as ' + result.user.displayName + ' ☁️');
+    }
+  }).catch(e => {
+    if (e.code !== 'auth/no-current-user') {
+      console.warn('Redirect result error:', e.message);
+    }
+  });
 
   window.fbSignOut = async () => {
     if (!firebaseReady) return;
