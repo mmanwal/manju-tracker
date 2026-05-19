@@ -1464,7 +1464,14 @@ function delEx(i){state.exercises.splice(i,1);syncAll();renderAll();}
 // ════════════════════════════════════════
 // TARGETS
 // ════════════════════════════════════════
-function openTargetsModal(){['cal','p','c','f','w'].forEach(k=>document.getElementById('tgt-'+k).value=targets[k]||'');openModal('targets-modal');}
+function openTargetsModal(){
+  ['cal','p','c','f','w'].forEach(k=>{
+    const el=document.getElementById('tgt-'+k);
+    if(el) el.value=targets[k]||'';
+  });
+  const el=document.getElementById('targets-modal');
+  if(el) el.classList.add('open');
+}
 function saveTargets(){
   const cal=parseInt(document.getElementById('tgt-cal').value);
   const p=parseInt(document.getElementById('tgt-p').value);
@@ -1533,7 +1540,18 @@ function openSearch(mealName){
   setTimeout(()=>document.getElementById('search-input').focus(),300);
 }
 function goBack(){setPage(prevPage,document.getElementById('nav-'+prevPage));}
-function openModal(id){if(id==='targets-modal')openTargetsModal();document.getElementById(id).classList.add('open');}
+function openModal(id){
+  if(id==='targets-modal'){
+    // Pre-fill targets fields before opening
+    ['cal','p','c','f','w'].forEach(k=>{
+      const el=document.getElementById('tgt-'+k);
+      if(el) el.value=targets[k]||'';
+    });
+  }
+  const el=document.getElementById(id);
+  if(el) el.classList.add('open');
+  else console.warn('Modal not found:',id);
+}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 function setSearchTab(tab,btn){
