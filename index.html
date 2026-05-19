@@ -325,6 +325,11 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 .card,.meal-card{animation:fadeIn .25s ease both}
 .wg-btn{padding:10px 6px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text2);border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;text-align:center;line-height:1.4;transition:all .15s}
 .wg-btn-active{background:var(--green-l);color:var(--green);border-color:var(--green-m);font-weight:600}
+.wt-chart-btn-active{background:var(--green-l)!important;color:var(--green)!important;border-color:var(--green-m)!important;font-weight:600!important}
+.wt-range-active{background:var(--green)!important;color:white!important;border-color:var(--green)!important}
+.wt-stat-mini{background:var(--bg2);border-radius:var(--rs);padding:8px;text-align:center}
+.wt-stat-mini .v{font-size:15px;font-weight:700}
+.wt-stat-mini .l{font-size:10px;color:var(--text3);margin-top:2px}
 .date-nav-btn{background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text2);font-size:20px;line-height:1;border-radius:6px}
 .date-nav-btn:active{background:var(--border)}
 .repeat-meal-btn{display:flex;align-items:center;gap:6px;width:100%;padding:9px 14px;color:var(--teal);font-size:12px;font-family:'DM Sans',sans-serif;background:var(--teal-l);border:none;border-top:1px solid var(--border);cursor:pointer;font-weight:500}
@@ -588,10 +593,35 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
           <div id="diary-history" style="max-height:240px;overflow-y:auto"></div>
         </div>
         <div class="card">
-          <div class="card-title">Weight history</div>
-          <div id="wt-hist-chart" style="display:flex;align-items:flex-end;gap:4px;height:72px;margin-bottom:6px"></div>
-          <div id="wt-hist-labels" style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3)"></div>
-          <div id="wt-hist-vals" style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-top:4px"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div class="card-title" style="margin:0">Weight history</div>
+            <div style="display:flex;gap:6px">
+              <button class="wg-btn wt-chart-btn wt-chart-btn-active" data-chart="line" onclick="setWtChart('line',this)" style="padding:5px 10px;font-size:11px">📈 Line</button>
+              <button class="wg-btn wt-chart-btn" data-chart="bar" onclick="setWtChart('bar',this)" style="padding:5px 10px;font-size:11px">📊 Bar</button>
+              <button class="wg-btn wt-chart-btn" data-chart="table" onclick="setWtChart('table',this)" style="padding:5px 10px;font-size:11px">📋 Log</button>
+            </div>
+          </div>
+          <!-- Range selector -->
+          <div style="display:flex;gap:6px;margin-bottom:12px" id="wt-range-btns">
+            <button class="pill wt-range-btn wt-range-active" data-range="30" onclick="setWtRange(30,this)">30d</button>
+            <button class="pill wt-range-btn" data-range="90" onclick="setWtRange(90,this)">90d</button>
+            <button class="pill wt-range-btn" data-range="180" onclick="setWtRange(180,this)">6m</button>
+            <button class="pill wt-range-btn" data-range="365" onclick="setWtRange(365,this)">1y</button>
+            <button class="pill wt-range-btn" data-range="9999" onclick="setWtRange(9999,this)">All</button>
+          </div>
+          <!-- Stats row -->
+          <div id="wt-stats-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px"></div>
+          <!-- Chart canvas -->
+          <div style="position:relative">
+            <canvas id="wt-canvas" height="160" style="width:100%;display:block"></canvas>
+            <div id="wt-no-data" style="display:none;text-align:center;padding:30px;color:var(--text3);font-size:13px">No weight entries yet — tap Log metrics on the diary page.</div>
+          </div>
+          <!-- Log table -->
+          <div id="wt-hist-table" style="max-height:300px;overflow-y:auto;display:none;margin-top:8px"></div>
+          <!-- Hidden legacy elements (kept for compatibility) -->
+          <div id="wt-hist-chart" style="display:none"></div>
+          <div id="wt-hist-labels" style="display:none"></div>
+          <div id="wt-hist-vals" style="display:none"></div>
         </div>
         <div class="card">
           <div style="display:flex;align-items:center;gap:12px">
@@ -1445,17 +1475,201 @@ function renderBodyMetrics(){
   if(pb) pb.textContent=bmi||'23.6';
   if(pbf) pbf.textContent=today.bodyFat?today.bodyFat+'%':'23.6%';
 }
-function renderWeightCard(){
-  const latest=weightLog[weightLog.length-1];
-  const wc=document.getElementById('wt-hist-chart'); wc.innerHTML='';
-  const hl=document.getElementById('wt-hist-labels'); hl.innerHTML='';
-  const hv=document.getElementById('wt-hist-vals'); hv.innerHTML='';
-  if(!weightLog.length){wc.innerHTML='<div style="color:var(--text3);font-size:13px;padding:16px 0">Log body metrics to see weight trend</div>';return;}
-  const last8=weightLog.slice(-8);
-  const mn=Math.min(...last8.map(x=>x.w)), mx=Math.max(...last8.map(x=>x.w)); const range=mx-mn||1;
-  last8.forEach(w=>{const h=Math.round(((w.w-mn)/range)*60)+10;const b=document.createElement('div');b.style.cssText=`flex:1;background:var(--teal-m);border-radius:4px 4px 0 0;height:${h}px;min-height:8px`;b.title=w.w+'kg';wc.appendChild(b);hl.innerHTML+=`<span>${w.date.slice(5)}</span>`;hv.innerHTML+=`<span>${w.w}</span>`;});
+// ════════════════════════════════════════
+// WEIGHT CHART
+// ════════════════════════════════════════
+let wtChartType = 'line';   // 'line' | 'bar' | 'table'
+let wtChartRange = 30;      // days
+
+function setWtChart(type, btn){
+  wtChartType = type;
+  document.querySelectorAll('.wt-chart-btn').forEach(b=>b.classList.remove('wt-chart-btn-active'));
+  btn.classList.add('wt-chart-btn-active');
+  renderWeightCard();
 }
-function renderWeightHistory(){renderWeightCard();}
+function setWtRange(days, btn){
+  wtChartRange = days;
+  document.querySelectorAll('.wt-range-btn').forEach(b=>b.classList.remove('wt-range-active'));
+  btn.classList.add('wt-range-active');
+  renderWeightCard();
+}
+
+function renderWeightCard(){
+  const canvas = document.getElementById('wt-canvas');
+  const noData = document.getElementById('wt-no-data');
+  const table  = document.getElementById('wt-hist-table');
+  const stats  = document.getElementById('wt-stats-row');
+  if(!canvas) return;
+
+  // Filter by range
+  const cutoff = new Date(TODAY); cutoff.setDate(cutoff.getDate() - wtChartRange);
+  const cutoffStr = cutoff.toISOString().slice(0,10);
+  const data = weightLog.filter(w => wtChartRange >= 9999 || w.date >= cutoffStr);
+
+  // Stats row
+  if(stats && data.length){
+    const vals = data.map(w=>w.w);
+    const latest = vals[vals.length-1];
+    const first  = vals[0];
+    const change = Math.round((latest-first)*10)/10;
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    const changeColor = change<0?'var(--green)':change>0?'var(--red)':'var(--text2)';
+    stats.innerHTML = `
+      <div class="wt-stat-mini"><div class="v">${latest} lbs</div><div class="l">Current</div></div>
+      <div class="wt-stat-mini"><div class="v" style="color:${changeColor}">${change>0?'+':''}${change} lbs</div><div class="l">Change</div></div>
+      <div class="wt-stat-mini"><div class="v">${lo}–${hi}</div><div class="l">Range (lbs)</div></div>`;
+  } else if(stats){
+    stats.innerHTML='';
+  }
+
+  // Show/hide canvas vs table
+  if(wtChartType === 'table'){
+    canvas.style.display = 'none';
+    if(noData) noData.style.display = 'none';
+    if(table) table.style.display = '';
+    renderWtTable(data);
+    return;
+  }
+  if(table) table.style.display = 'none';
+
+  if(!data.length){
+    canvas.style.display = 'none';
+    if(noData){ noData.style.display=''; noData.textContent='No weight entries in this range — log body metrics to track.'; }
+    return;
+  }
+  canvas.style.display = '';
+  if(noData) noData.style.display = 'none';
+
+  // Draw on canvas
+  const dpr = window.devicePixelRatio||1;
+  const W = canvas.offsetWidth||300;
+  const H = 160;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,W,H);
+
+  // Resolve CSS vars
+  const style = getComputedStyle(document.documentElement);
+  const green   = style.getPropertyValue('--green').trim()   || '#639922';
+  const greenM  = style.getPropertyValue('--green-m').trim() || '#8abe3a';
+  const greenL  = style.getPropertyValue('--green-l').trim() || '#eef5e4';
+  const text3   = style.getPropertyValue('--text3').trim()   || '#aaa';
+  const border  = style.getPropertyValue('--border').trim()  || '#e0e0e0';
+
+  const PAD = {top:16, right:8, bottom:36, left:44};
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top  - PAD.bottom;
+
+  const vals = data.map(w=>w.w);
+  const mn = Math.min(...vals) - 0.5;
+  const mx = Math.max(...vals) + 0.5;
+  const range = mx - mn || 1;
+
+  const xOf = i => PAD.left + (i / (data.length-1||1)) * cW;
+  const yOf = v => PAD.top  + cH - ((v - mn) / range) * cH;
+
+  // Grid lines + y-labels
+  ctx.strokeStyle = border; ctx.lineWidth = 0.5;
+  ctx.fillStyle   = text3;  ctx.font = `10px DM Sans, sans-serif`;
+  ctx.textAlign   = 'right';
+  const ticks = 4;
+  for(let i=0;i<=ticks;i++){
+    const v   = mn + (range/ticks)*i;
+    const y   = yOf(v);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W-PAD.right, y); ctx.stroke();
+    ctx.fillText(Math.round(v*10)/10, PAD.left-4, y+4);
+  }
+
+  if(wtChartType === 'bar'){
+    const bW = Math.max(2, cW/data.length - 3);
+    data.forEach((w,i)=>{
+      const x  = PAD.left + (i/(data.length||1))*cW + (cW/data.length - bW)/2;
+      const y  = yOf(w.w);
+      const bH = (PAD.top + cH) - y;
+      const isLatest = i === data.length-1;
+      ctx.fillStyle = isLatest ? green : greenM;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x, y, bW, bH, [3,3,0,0]) : ctx.rect(x, y, bW, bH);
+      ctx.fill();
+    });
+  } else {
+    // Line chart — gradient fill under line
+    const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top+cH);
+    grad.addColorStop(0, greenL);
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.beginPath();
+    data.forEach((w,i)=>i===0 ? ctx.moveTo(xOf(i),yOf(w.w)) : ctx.lineTo(xOf(i),yOf(w.w)));
+    ctx.lineTo(xOf(data.length-1), PAD.top+cH);
+    ctx.lineTo(xOf(0), PAD.top+cH);
+    ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.strokeStyle = green; ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    data.forEach((w,i)=>i===0 ? ctx.moveTo(xOf(i),yOf(w.w)) : ctx.lineTo(xOf(i),yOf(w.w)));
+    ctx.stroke();
+
+    // Dots
+    data.forEach((w,i)=>{
+      const isLatest = i===data.length-1;
+      ctx.beginPath();
+      ctx.arc(xOf(i), yOf(w.w), isLatest?5:3, 0, Math.PI*2);
+      ctx.fillStyle = isLatest ? green : greenM;
+      ctx.fill();
+    });
+
+    // Latest value label
+    const lx = xOf(data.length-1), ly = yOf(vals[vals.length-1]);
+    ctx.fillStyle = green; ctx.font = `bold 11px DM Sans, sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.fillText(vals[vals.length-1]+' lbs', lx-8, ly-8);
+  }
+
+  // X-axis labels — show up to 6 evenly spaced
+  ctx.fillStyle = text3; ctx.font = `10px DM Sans, sans-serif`; ctx.textAlign='center';
+  const step = Math.max(1, Math.floor(data.length/6));
+  data.forEach((w,i)=>{
+    if(i===0 || i===data.length-1 || i%step===0){
+      const dt = new Date(w.date+'T12:00:00');
+      const lbl = dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      ctx.fillText(lbl, xOf(i), H-8);
+    }
+  });
+}
+
+function renderWtTable(data){
+  const table = document.getElementById('wt-hist-table');
+  if(!table) return;
+  if(!data.length){
+    table.innerHTML='<div style="color:var(--text3);font-size:13px;padding:10px 0">No entries in this range.</div>';
+    return;
+  }
+  const sorted = [...data].reverse();
+  const totalChange = sorted.length>1 ? Math.round((sorted[0].w - sorted[sorted.length-1].w)*10)/10 : null;
+  table.innerHTML =
+    (totalChange!==null ? `<div style="font-size:12px;color:${totalChange<0?'var(--green)':totalChange>0?'var(--red)':'var(--text2)'};font-weight:600;margin-bottom:10px">${totalChange>0?'+':''}${totalChange} lbs over this period</div>` : '') +
+    sorted.map((w,i)=>{
+      const prev = sorted[i+1];
+      const delta = prev ? Math.round((w.w-prev.w)*10)/10 : null;
+      const deltaStr = delta===null?'—':delta===0?'no change':(delta>0?'▲ +':'▼ ')+Math.abs(delta)+' lbs';
+      const dc = delta===null?'var(--text3)':delta<0?'var(--green)':delta>0?'var(--red)':'var(--text3)';
+      const dt = new Date(w.date+'T12:00:00');
+      const lbl = dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px;color:var(--text2);flex:1">${lbl}</span>
+        <span style="font-size:15px;font-weight:700;margin:0 12px">${w.w} lbs</span>
+        <span style="font-size:11px;color:${dc};min-width:80px;text-align:right">${deltaStr}</span>
+      </div>`;
+    }).join('');
+}
+
+function renderWeightHistory(){ renderWeightCard(); }
 
 // ════════════════════════════════════════
 // VITAMINS & SUPPLEMENTS LOG
@@ -2382,7 +2596,7 @@ function setPage(name,btn){
   document.querySelectorAll('.nav-btn').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   if(btn)btn.classList.add('active');
-  if(name==='trends')renderTrends();
+  if(name==='trends'){ renderTrends(); setTimeout(renderWeightCard, 50); }
 }
 function openSearch(mealName){
   if(viewDate!==TODAY){showToast('Cannot add food to past logs');return;}
