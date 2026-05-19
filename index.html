@@ -616,10 +616,66 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
         <div class="card">
           <div class="card-title">Profile</div>
           <div class="setting-row"><span class="sl">Name</span><span class="sv">Manju</span></div>
-          <div class="setting-row"><span class="sl">Date of birth</span><span class="sv">4 Dec 1967 (58)</span></div>
+          <div class="setting-row"><span class="sl">Age</span><span class="sv" id="prof-age">58</span></div>
+          <div class="setting-row"><span class="sl">Sex</span><span class="sv">Female</span></div>
+          <div class="setting-row"><span class="sl">Weight</span><span class="sv" id="prof-weight">136.6 lbs</span></div>
+          <div class="setting-row"><span class="sl">Height</span><span class="sv">5' 4"</span></div>
+          <div class="setting-row"><span class="sl">BMI</span><span class="sv" id="prof-bmi">23.6</span></div>
+          <div class="setting-row"><span class="sl">Body Fat</span><span class="sv" id="prof-bf">23.6%</span></div>
           <div class="setting-row"><span class="sl">Diet</span><span class="sv">Vegan 🌱</span></div>
           <div class="setting-row"><span class="sl">Location</span><span class="sv">Chicago, IL</span></div>
           <div class="tags-row"><span class="tag t-grn">Plant-based</span><span class="tag t-grn">Indian cuisine</span><span class="tag t-tel">Chicago</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Targets</div>
+          <div class="setting-row" onclick="openModal('targets-modal')" style="cursor:pointer">
+            <span class="sl">Weight Goal</span><span class="sv">Maintain weight <span style="color:var(--text3)">›</span></span>
+          </div>
+          <div class="setting-row" onclick="openModal('targets-modal')" style="cursor:pointer">
+            <span class="sl">Macro & Energy Targets</span><span class="sv" id="t-cal-row">1,800 kcal <span style="color:var(--text3)">›</span></span>
+          </div>
+          <div class="setting-row" onclick="openModal('targets-modal')" style="cursor:pointer">
+            <span class="sl">Protein target</span><span class="sv" id="t-pro-row">70g <span style="color:var(--text3)">›</span></span>
+          </div>
+          <div class="setting-row" onclick="openModal('targets-modal')" style="cursor:pointer">
+            <span class="sl">Carb target</span><span class="sv" id="t-car-row">200g <span style="color:var(--text3)">›</span></span>
+          </div>
+          <div class="setting-row" onclick="openModal('targets-modal')" style="cursor:pointer">
+            <span class="sl">Fat target</span><span class="sv" id="t-fat-row">55g <span style="color:var(--text3)">›</span></span>
+          </div>
+          <div class="setting-row" onclick="openModal('targets-modal')" style="cursor:pointer">
+            <span class="sl">Nutrient Targets</span><span class="sv">Fibre 30g <span style="color:var(--text3)">›</span></span>
+          </div>
+          <button class="btn-secondary" onclick="openModal('targets-modal')" style="margin-top:8px">Edit all targets</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Display settings</div>
+          <div class="setting-row">
+            <span class="sl">Units</span>
+            <span class="sv">Imperial (lbs, inches)</span>
+          </div>
+          <div class="setting-row" style="justify-content:space-between">
+            <span class="sl">Show macronutrient breakdown</span>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+              <input type="checkbox" id="toggle-macros" checked style="opacity:0;width:0;height:0">
+              <span onclick="document.getElementById('toggle-macros').click()" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#639922;border-radius:24px;transition:.3s"></span>
+              <span onclick="document.getElementById('toggle-macros').click()" style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;transform:translateX(20px)"></span>
+            </label>
+          </div>
+          <div class="setting-row" style="justify-content:space-between">
+            <span class="sl">Show water widget</span>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+              <input type="checkbox" id="toggle-water" checked style="opacity:0;width:0;height:0">
+              <span onclick="document.getElementById('toggle-water').click()" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#639922;border-radius:24px;transition:.3s"></span>
+              <span onclick="document.getElementById('toggle-water').click()" style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;transform:translateX(20px)"></span>
+            </label>
+          </div>
+          <div class="setting-row" style="justify-content:space-between">
+            <span class="sl">Dark mode</span>
+            <span class="sv" style="font-size:12px;color:var(--text3)">Follows system</span>
+          </div>
         </div>
 
         <div class="card">
@@ -1080,14 +1136,21 @@ function saveBodyMetrics(){
 }
 function renderBodyMetrics(){
   const today=bodyMetrics[TODAY]||{};
-  const heightIn=ls(HEIGHT_KEY,63); // height in inches
-  const wt=today.weight||(weightLog.length?weightLog[weightLog.length-1].w:null);
+  const heightIn=ls(HEIGHT_KEY,64); // 5'4" = 64 inches
+  const wt=today.weight||(weightLog.length?weightLog[weightLog.length-1].w:null)||136.6;
   // BMI formula using lbs and inches: (weight_lbs / height_in^2) * 703
   const bmi=wt&&heightIn?Math.round((wt/(heightIn**2))*703*10)/10:null;
   document.getElementById('bm-weight').textContent=wt?wt+' lbs':'—';
-  document.getElementById('bm-bf').textContent=today.bodyFat?today.bodyFat+'%':'—';
+  document.getElementById('bm-bf').textContent=today.bodyFat?today.bodyFat+'%':'23.6%';
   document.getElementById('bm-sleep').textContent=today.sleep?today.sleep+'h':'—';
-  document.getElementById('bm-bmi').textContent=bmi||'—';
+  document.getElementById('bm-bmi').textContent=bmi||'23.6';
+  // Update profile section too
+  const pw=document.getElementById('prof-weight');
+  const pb=document.getElementById('prof-bmi');
+  const pbf=document.getElementById('prof-bf');
+  if(pw) pw.textContent=wt?wt+' lbs':'136.6 lbs';
+  if(pb) pb.textContent=bmi||'23.6';
+  if(pbf) pbf.textContent=today.bodyFat?today.bodyFat+'%':'23.6%';
 }
 function renderWeightCard(){
   const latest=weightLog[weightLog.length-1];
@@ -1417,6 +1480,15 @@ function saveTargets(){
   document.getElementById('t-fat').textContent=f+'g';
   document.getElementById('avg-goal').textContent=cal.toLocaleString();
   document.getElementById('avg-pg').textContent=p+'g';
+  // Update target rows in profile section
+  const calRow=document.getElementById('t-cal-row');
+  const proRow=document.getElementById('t-pro-row');
+  const carRow=document.getElementById('t-car-row');
+  const fatRow=document.getElementById('t-fat-row');
+  if(calRow) calRow.innerHTML=cal.toLocaleString()+' kcal <span style="color:var(--text3)">›</span>';
+  if(proRow) proRow.innerHTML=p+'g <span style="color:var(--text3)">›</span>';
+  if(carRow) carRow.innerHTML=c+'g <span style="color:var(--text3)">›</span>';
+  if(fatRow) fatRow.innerHTML=f+'g <span style="color:var(--text3)">›</span>';
   closeModal('targets-modal'); renderAll(); showToast('Targets updated!');
 }
 
