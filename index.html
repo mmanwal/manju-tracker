@@ -882,23 +882,37 @@ function showCloudSaved(){
 // AUTH UI
 // ════════════════════════════════════════
 function updateAuthUI(user){
+  // Wait for DOM elements to exist
   const out=document.getElementById('signed-out-view');
   const inn=document.getElementById('signed-in-view');
   const dot=document.getElementById('cloud-dot');
   const av=document.getElementById('avatar-btn');
+  if(!dot||!av) {
+    // DOM not ready yet, retry in 500ms
+    setTimeout(()=>updateAuthUI(user), 500);
+    return;
+  }
   if(user){
-    out.style.display='none'; inn.style.display='';
-    document.getElementById('user-name-display').textContent=user.displayName||'Manju';
-    document.getElementById('user-email-display').textContent=user.email||'';
+    if(out) out.style.display='none';
+    if(inn) inn.style.display='';
+    const nameEl=document.getElementById('user-name-display');
+    const emailEl=document.getElementById('user-email-display');
+    if(nameEl) nameEl.textContent=user.displayName||'Manju';
+    if(emailEl) emailEl.textContent=user.email||'';
     const pic=document.getElementById('profile-pic-small');
-    if(user.photoURL){pic.innerHTML=`<img src="${user.photoURL}" style="width:100%;height:100%;border-radius:50%">`;}
+    if(pic&&user.photoURL){pic.innerHTML=`<img src="${user.photoURL}" style="width:100%;height:100%;border-radius:50%">`;}
     if(user.photoURL){av.innerHTML=`<img src="${user.photoURL}">`;}
-    dot.classList.add('synced'); dot.classList.remove('error');
+    // Force dot green
+    dot.classList.add('synced');
+    dot.classList.remove('error');
+    dot.style.background='#639922';
     document.getElementById('firebase-setup-card').style.display='none';
   } else {
-    out.style.display=''; inn.style.display='none';
+    if(out) out.style.display='';
+    if(inn) inn.style.display='none';
     av.innerHTML='MJ';
     dot.classList.remove('synced','error');
+    dot.style.background='';
   }
 }
 function handleAvatarClick(){
@@ -1482,6 +1496,18 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('t-fat').textContent=targets.f+'g';
   if(usdaKey&&usdaKey!=='DEMO_KEY') document.getElementById('key-status').textContent='✓ Custom key active';
   renderAll();
+  // Poll for auth state for 30 seconds after load to catch redirect sign-in
+  let authPollCount = 0;
+  const authPoller = setInterval(() => {
+    authPollCount++;
+    const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+    const dot = document.getElementById('cloud-dot');
+    if(user && dot && !dot.classList.contains('synced')){
+      updateAuthUI(user);
+      clearInterval(authPoller);
+    }
+    if(authPollCount > 15) clearInterval(authPoller); // stop after 30s
+  }, 2000);
 });
 window.addEventListener('authChanged', e => {
   updateAuthUI(e.detail);
