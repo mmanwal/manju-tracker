@@ -98,7 +98,11 @@
       if (todayDoc.exists()) {
         const d = todayDoc.data();
         if (d.meals) state.meals = d.meals;
-        if (d.water !== undefined) state.water = d.water;
+        if (d.water !== undefined) {
+          // Ignore stale default water=5 if no food logged
+          const totalFoods = state.meals ? state.meals.reduce((s,m)=>s+(m.foods?m.foods.length:0),0) : 0;
+          if (!(d.water === 5 && totalFoods === 0)) state.water = d.water;
+        }
         if (d.exercises) state.exercises = d.exercises;
         renderAll();
       }
@@ -1410,81 +1414,216 @@ function renderWeightCard(){
 function renderWeightHistory(){renderWeightCard();}
 
 // ════════════════════════════════════════
-// NUTRIENTS
+// NUTRIENTS — dynamic from logged foods
 // ════════════════════════════════════════
-const NUTRIENTS=[
-  {name:'Vitamin B12',pct:28,color:'#A32D2D'},{name:'Iron',pct:62,color:'#BA7517'},
-  {name:'Calcium',pct:81,color:'#639922'},{name:'Zinc',pct:55,color:'#BA7517'},
-  {name:'Vitamin D',pct:40,color:'#A32D2D'},{name:'Omega-3',pct:45,color:'#0F6E56'},
-  {name:'Fibre',pct:87,color:'#639922'},{name:'Magnesium',pct:72,color:'#639922'},
-  {name:'Vitamin C',pct:95,color:'#639922'},{name:'Folate',pct:68,color:'#0F6E56'},
-  {name:'Potassium',pct:75,color:'#639922'},{name:'Vitamin A',pct:60,color:'#BA7517'},
-  {name:'Vitamin K',pct:110,color:'#639922'},{name:'Phosphorus',pct:80,color:'#639922'},
-];
-const AMINOS=[{name:'Leucine',pct:72},{name:'Lysine',pct:58},{name:'Methionine',pct:45},{name:'Threonine',pct:80},{name:'Valine',pct:70},{name:'Isoleucine',pct:75},{name:'Tryptophan',pct:65},{name:'Phenylalanine',pct:88}];
-const FATTY=[{name:'Omega-3 ALA',pct:45,color:'#A32D2D'},{name:'Omega-6 LA',pct:90,color:'#639922'},{name:'DHA',pct:10,color:'#A32D2D'},{name:'EPA',pct:8,color:'#A32D2D'},{name:'Saturated fat',pct:55,color:'#BA7517'},{name:'Monounsaturated',pct:78,color:'#639922'}];
+
+// RDI targets for vegan female ~58yo
+const NUTRIENT_RDI = {
+  fiber:    25,   // g
+  vitC:     75,   // mg
+  iron:     8,    // mg (post-menopause)
+  calcium:  1200, // mg
+  vitD:     20,   // mcg
+  vitB12:   2.4,  // mcg
+  zinc:     8,    // mg
+  magnesium:320,  // mg
+  potassium:2600, // mg
+  folate:   400,  // mcg
+  vitA:     700,  // mcg RAE
+  vitK:     90,   // mcg
+  phosphorus:700, // mg
+  omega3:   1.1,  // g
+};
+
+// Approximate nutrient content per 100 kcal for common vegan foods
+// We estimate from the foods logged — each food contributes proportionally
+function estimateNutrientPct(nutrient){
+  const eaten = totalEaten();
+  if(eaten === 0) return 0;
+  // Ratio of calories eaten vs target (0–1)
+  const cRatio = Math.min(eaten / targets.cal, 1);
+  // Each nutrient has a base "adequacy per 100% calories" for a balanced vegan diet
+  // These are scaled so 100% calories eaten = ~this % of RDI
+  const baseAdequacy = {
+    fiber:100, vitC:110, iron:75, calcium:60, vitD:35, vitB12:30,
+    zinc:70, magnesium:85, potassium:90, folate:80, vitA:70, vitK:120,
+    phosphorus:90, omega3:50
+  };
+  // Food-specific bonuses: logged foods boost specific nutrients
+  let bonus = 0;
+  const allFoods = state.meals.flatMap(m=>m.foods.map(f=>f.name.toLowerCase()));
+  const boosts = {
+    fiber:    ['dal','chana','rajma','lentil','chickpea','oat','quinoa','brown rice','millet','chia','flax','broccoli','spinach','sweet potato','beetroot'],
+    vitC:     ['guava','papaya','amla','spinach','broccoli','sweet potato','mango','pomegranate'],
+    iron:     ['tofu','tempeh','lentil','chickpea','kidney','spinach','quinoa','seitan','edamame','flax'],
+    calcium:  ['tofu','almond milk','oat milk','broccoli','chia','flax','tempeh'],
+    vitD:     ['oat milk','almond milk','mushroom'],
+    vitB12:   ['nutritional yeast','oat milk','almond milk','tempeh'],
+    zinc:     ['hemp','pumpkin','tofu','tempeh','lentil','chickpea','quinoa','oat'],
+    magnesium:['hemp','chia','flax','quinoa','dark chocolate','spinach','oat','almond','walnut'],
+    potassium:['banana','sweet potato','avocado','spinach','beetroot','coconut'],
+    folate:   ['lentil','chickpea','spinach','edamame','broccoli','avocado','beetroot'],
+    vitA:     ['sweet potato','spinach','papaya','mango','carrot','broccoli'],
+    vitK:     ['spinach','broccoli','kale','edamame','avocado'],
+    phosphorus:['tofu','tempeh','lentil','quinoa','oat','hemp','almond','walnut'],
+    omega3:   ['flax','chia','hemp','walnut','edamame'],
+  };
+  if(boosts[nutrient]){
+    const matched = allFoods.filter(f=>boosts[nutrient].some(b=>f.includes(b))).length;
+    bonus = Math.min(matched * 8, 40); // up to +40% bonus
+  }
+  return Math.round(cRatio * (baseAdequacy[nutrient]||70) + bonus);
+}
+
 function renderNutrients(){
-  document.getElementById('nutrient-list').innerHTML=NUTRIENTS.map(n=>`<div class="nut-row"><div class="nut-nm">${n.name}</div><div class="nut-bar"><div class="nut-fill" style="width:${Math.min(n.pct,100)}%;background:${n.color}"></div></div><div class="nut-pct">${n.pct}%</div></div>`).join('');
-  document.getElementById('amino-list').innerHTML=AMINOS.map(n=>`<div class="nut-row"><div class="nut-nm">${n.name}</div><div class="nut-bar"><div class="nut-fill" style="width:${n.pct}%;background:var(--teal-m)"></div></div><div class="nut-pct">${n.pct}%</div></div>`).join('');
-  document.getElementById('fat-list').innerHTML=FATTY.map(n=>`<div class="nut-row"><div class="nut-nm">${n.name}</div><div class="nut-bar"><div class="nut-fill" style="width:${Math.min(n.pct,100)}%;background:${n.color||'var(--green-m)'}"></div></div><div class="nut-pct">${n.pct}%</div></div>`).join('');
+  const nutrients = [
+    {name:'Vitamin B12',key:'vitB12',color:'#A32D2D'},
+    {name:'Iron',key:'iron',color:'#BA7517'},
+    {name:'Calcium',key:'calcium',color:'#639922'},
+    {name:'Zinc',key:'zinc',color:'#BA7517'},
+    {name:'Vitamin D',key:'vitD',color:'#A32D2D'},
+    {name:'Omega-3',key:'omega3',color:'#0F6E56'},
+    {name:'Fibre',key:'fiber',color:'#639922'},
+    {name:'Magnesium',key:'magnesium',color:'#639922'},
+    {name:'Vitamin C',key:'vitC',color:'#639922'},
+    {name:'Folate',key:'folate',color:'#0F6E56'},
+    {name:'Potassium',key:'potassium',color:'#639922'},
+    {name:'Vitamin A',key:'vitA',color:'#BA7517'},
+    {name:'Vitamin K',key:'vitK',color:'#639922'},
+    {name:'Phosphorus',key:'phosphorus',color:'#639922'},
+  ];
+  const eaten = totalEaten();
+  document.getElementById('nutrient-list').innerHTML = nutrients.map(n=>{
+    const pct = estimateNutrientPct(n.key);
+    const bar = Math.min(pct,100);
+    const label = eaten===0 ? '0%' : pct+'%';
+    return `<div class="nut-row"><div class="nut-nm">${n.name}</div><div class="nut-bar"><div class="nut-fill" style="width:${bar}%;background:${n.color}"></div></div><div class="nut-pct">${label}</div></div>`;
+  }).join('');
+
+  // Aminos scale with protein intake
+  const pRatio = Math.min(totalP() / targets.p, 1);
+  const AMINOS_BASE = [{name:'Leucine',pct:88},{name:'Lysine',pct:72},{name:'Methionine',pct:58},
+    {name:'Threonine',pct:95},{name:'Valine',pct:85},{name:'Isoleucine',pct:90},
+    {name:'Tryptophan',pct:80},{name:'Phenylalanine',pct:105}];
+  document.getElementById('amino-list').innerHTML = AMINOS_BASE.map(n=>{
+    const pct = Math.round(n.pct * pRatio);
+    return `<div class="nut-row"><div class="nut-nm">${n.name}</div><div class="nut-bar"><div class="nut-fill" style="width:${Math.min(pct,100)}%;background:var(--teal-m)"></div></div><div class="nut-pct">${pct}%</div></div>`;
+  }).join('');
+
+  // Fatty acids scale with fat intake
+  const fRatio = Math.min(totalF() / targets.f, 1);
+  const FATTY_BASE = [{name:'Omega-3 ALA',pct:55,color:'#A32D2D'},{name:'Omega-6 LA',pct:110,color:'#639922'},
+    {name:'DHA',pct:12,color:'#A32D2D'},{name:'EPA',pct:10,color:'#A32D2D'},
+    {name:'Saturated fat',pct:65,color:'#BA7517'},{name:'Monounsaturated',pct:90,color:'#639922'}];
+  document.getElementById('fat-list').innerHTML = FATTY_BASE.map(n=>{
+    const pct = Math.round(n.pct * fRatio);
+    return `<div class="nut-row"><div class="nut-nm">${n.name}</div><div class="nut-bar"><div class="nut-fill" style="width:${Math.min(pct,100)}%;background:${n.color||'var(--green-m)'}"></div></div><div class="nut-pct">${pct}%</div></div>`;
+  }).join('');
 }
 
 // ════════════════════════════════════════
 // TRENDS & HISTORY
 // ════════════════════════════════════════
+
+// Scan localStorage for all saved day keys mnj_YYYY-MM-DD
+function buildLocalHistory(){
+  const days = [];
+  const dateRx = /^mnj_(\d{4}-\d{2}-\d{2})$/;
+  for(let i=0; i<localStorage.length; i++){
+    const key = localStorage.key(i);
+    const m = key && key.match(dateRx);
+    if(!m) continue;
+    const date = m[1];
+    try{
+      const saved = JSON.parse(localStorage.getItem(key));
+      if(!saved || !saved.meals) continue;
+      const calories = saved.meals.reduce((s,meal)=>s+meal.foods.reduce((a,f)=>a+(f.kcal||0),0),0);
+      const protein  = saved.meals.reduce((s,meal)=>s+meal.foods.reduce((a,f)=>a+(f.p||0),0),0);
+      if(calories > 0) days.push({date, calories, protein});
+    } catch(e){}
+  }
+  return days;
+}
+
 function renderTrends(){
-  const allDays=[...history90];
-  const todayEntry={date:TODAY,calories:totalEaten(),protein:totalP()};
-  if(!allDays.find(d=>d.date===TODAY)) allDays.push(todayEntry);
-  allDays.sort((a,b)=>a.date.localeCompare(b.date));
+  // Merge localStorage history with Firestore history90 (cloud wins on conflict)
+  const localDays = buildLocalHistory();
+  const merged = {};
+  localDays.forEach(d=>{ merged[d.date] = d; });
+  history90.forEach(d=>{ merged[d.date] = d; }); // cloud overwrites local
+  // Always include today's current state
+  const todayEaten = totalEaten();
+  merged[TODAY] = {date:TODAY, calories:todayEaten, protein:totalP()};
+
+  const allDays = Object.values(merged).sort((a,b)=>a.date.localeCompare(b.date));
 
   // 30-day chart
-  const last30=allDays.slice(-30);
-  const hc=document.getElementById('hist-chart'); hc.innerHTML='';
-  const mx=Math.max(...last30.map(d=>d.calories||0),targets.cal,1);
-  last30.forEach((d,i)=>{
-    const h=Math.round(((d.calories||0)/mx)*76)+4;
-    const isT=d.date===TODAY;
-    const b=document.createElement('div');
-    b.className='hbar'+(isT?' ht':'');
-    b.style.height=h+'px'; b.title=d.date+': '+(d.calories||0)+' kcal';
+  const last30 = allDays.slice(-30);
+  const hc = document.getElementById('hist-chart'); hc.innerHTML='';
+  const mx = Math.max(...last30.map(d=>d.calories||0), targets.cal, 1);
+  last30.forEach(d=>{
+    const h = Math.round(((d.calories||0)/mx)*76)+4;
+    const isT = d.date===TODAY;
+    const b = document.createElement('div');
+    b.className = 'hbar'+(isT?' ht':'');
+    b.style.height = h+'px';
+    b.title = d.date+': '+(d.calories||0)+' kcal';
     hc.appendChild(b);
   });
   if(last30.length>0){
-    document.getElementById('hist-start-lbl').textContent=last30[0].date.slice(5);
+    document.getElementById('hist-start-lbl').textContent = last30[0].date.slice(5);
   }
 
-  // Week chart
-  const wk=[0,0,0,0,0,0,totalEaten()];
-  const today=new Date();
-  for(let i=1;i<=6;i++){const d=new Date(today);d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);const found=allDays.find(x=>x.date===ds);wk[6-i]=found?found.calories:0;}
-  const wkMx=Math.max(...wk,1);
-  document.getElementById('week-chart').innerHTML=wk.map((v,i)=>`<div class="bar-wrap"><div class="bar${i===6?' today':''}" style="height:${Math.round((v/wkMx)*80)}px" title="${v} kcal"></div></div>`).join('');
+  // Week chart — last 7 days
+  const wkVals = [];
+  for(let i=6; i>=0; i--){
+    const d = new Date(TODAY+'T12:00:00');
+    d.setDate(d.getDate()-i);
+    const ds = d.toISOString().slice(0,10);
+    wkVals.push({val: merged[ds]?.calories||0, isToday: i===0});
+  }
+  const wkMx = Math.max(...wkVals.map(v=>v.val), 1);
+  document.getElementById('week-chart').innerHTML = wkVals.map(v=>
+    `<div class="bar-wrap"><div class="bar${v.isToday?' today':''}" style="height:${Math.round((v.val/wkMx)*80)}px" title="${v.val} kcal"></div></div>`
+  ).join('');
 
   // Averages
-  const withCals=allDays.filter(d=>d.calories>0);
+  const withCals = allDays.filter(d=>d.calories>0);
   if(withCals.length){
-    const avgCal=Math.round(withCals.reduce((s,d)=>s+(d.calories||0),0)/withCals.length);
-    const avgP=Math.round(withCals.reduce((s,d)=>s+(d.protein||0),0)/withCals.length);
-    document.getElementById('avg-cal').textContent=avgCal.toLocaleString();
-    document.getElementById('avg-prot').textContent=avgP+'g';
-    document.getElementById('days-logged').textContent=withCals.length;
-    const best=withCals.reduce((b,d)=>Math.abs((d.calories||0)-targets.cal)<Math.abs((b.calories||0)-targets.cal)?d:b);
-    document.getElementById('best-day').textContent=(best.calories||0).toLocaleString();
+    const avgCal = Math.round(withCals.reduce((s,d)=>s+(d.calories||0),0)/withCals.length);
+    const avgP   = Math.round(withCals.reduce((s,d)=>s+(d.protein||0),0)/withCals.length);
+    document.getElementById('avg-cal').textContent = avgCal.toLocaleString();
+    document.getElementById('avg-prot').textContent = avgP+'g';
+    document.getElementById('days-logged').textContent = withCals.length;
+    const best = withCals.reduce((b,d)=>Math.abs((d.calories||0)-targets.cal)<Math.abs((b.calories||0)-targets.cal)?d:b);
+    document.getElementById('best-day').textContent = (best.calories||0).toLocaleString();
+  } else {
+    document.getElementById('avg-cal').textContent = '—';
+    document.getElementById('avg-prot').textContent = '—';
+    document.getElementById('days-logged').textContent = '0';
+    document.getElementById('best-day').textContent = '—';
   }
-  document.getElementById('avg-goal').textContent=targets.cal.toLocaleString();
-  document.getElementById('avg-pg').textContent=targets.p+'g';
+  document.getElementById('avg-goal').textContent = targets.cal.toLocaleString();
+  document.getElementById('avg-pg').textContent = targets.p+'g';
 
   // Full log table
-  const diaryEl=document.getElementById('diary-history');
-  const sorted=[...allDays].reverse().slice(0,60);
-  if(!sorted.length){diaryEl.innerHTML='<div style="color:var(--text3);font-size:13px;padding:10px 0">No diary history yet. Start logging!</div>';return;}
-  diaryEl.innerHTML=sorted.map(d=>`
-    <div class="hist-row">
-      <span class="hist-date">${d.date}</span>
-      <span class="hist-cal">${(d.calories||0).toLocaleString()} kcal</span>
+  const diaryEl = document.getElementById('diary-history');
+  const sorted = [...allDays].reverse().slice(0,90);
+  if(!sorted.length){
+    diaryEl.innerHTML='<div style="color:var(--text3);font-size:13px;padding:10px 0">No diary history yet. Start logging!</div>';
+    return;
+  }
+  diaryEl.innerHTML = sorted.map(d=>{
+    const dt = new Date(d.date+'T12:00:00');
+    const label = dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const pct = Math.round((d.calories/targets.cal)*100);
+    const color = pct>=90&&pct<=115 ? 'var(--green)' : pct>115 ? 'var(--red)' : 'var(--amber)';
+    return `<div class="hist-row" onclick="loadDateView('${d.date}')" style="cursor:pointer">
+      <span class="hist-date">${label}</span>
+      <span class="hist-cal" style="color:${color}">${(d.calories||0).toLocaleString()} kcal</span>
       <span style="font-size:12px;color:var(--text3)">P:${d.protein||0}g</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ════════════════════════════════════════
