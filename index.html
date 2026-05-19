@@ -831,23 +831,39 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
     <button class="modal-close" onclick="closeModal('exercise-modal')">×</button>
     <div class="modal-title">Log exercise</div>
     <div class="form-group"><label class="form-label">Activity</label>
-      <select class="form-input" id="ex-type">
-        <option value="Walking|3.5">Walking</option>
-        <option value="Running|8">Running</option>
-        <option value="Cycling|6">Cycling</option>
-        <option value="Yoga|2.5">Yoga</option>
-        <option value="Swimming|7">Swimming</option>
-        <option value="HIIT|9">HIIT</option>
-        <option value="Dancing|5">Dancing / Zumba</option>
-        <option value="Strength training|5">Strength training</option>
-        <option value="Custom|3">Custom</option>
+      <select class="form-input" id="ex-type" onchange="onExTypeChange()">
+        <option value="Walking|3.5">🚶 Walking</option>
+        <option value="Running|8">🏃 Running</option>
+        <option value="Cycling|6">🚴 Cycling</option>
+        <option value="Yoga|2.5">🧘 Yoga</option>
+        <option value="Swimming|7">🏊 Swimming</option>
+        <option value="HIIT|9">💥 HIIT</option>
+        <option value="Dancing|5">💃 Dancing / Zumba</option>
+        <option value="Strength training|5">🏋️ Strength training</option>
+        <option value="Custom|3">✏️ Custom</option>
       </select>
     </div>
+
+    <!-- Steps input — shown only for Walking -->
+    <div id="steps-section" style="margin-bottom:14px">
+      <label class="form-label">Steps</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input class="form-input" type="number" id="ex-steps" placeholder="e.g. 8000" style="width:120px;flex-shrink:0" oninput="onStepsInput()">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="pill" onclick="setSteps(5000)">5k</button>
+          <button class="pill" onclick="setSteps(7500)">7.5k</button>
+          <button class="pill" onclick="setSteps(10000)">10k</button>
+          <button class="pill" onclick="setSteps(12000)">12k</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">~2,000 steps = 1 mile · 10,000 steps = ~400 kcal</div>
+    </div>
+
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Duration (min)</label><input class="form-input" type="number" id="ex-dur" placeholder="30"></div>
+      <div class="form-group"><label class="form-label">Duration (min)</label><input class="form-input" type="number" id="ex-dur" placeholder="30" oninput="onDurInput()"></div>
       <div class="form-group"><label class="form-label">Calories burned</label><input class="form-input" type="number" id="ex-burn-input" placeholder="auto"></div>
     </div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Auto-estimated for 128 lbs body weight</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:14px" id="ex-weight-note">Auto-estimated for your body weight</div>
     <button class="btn-primary" onclick="logExercise()">Log exercise</button>
   </div>
 </div>
@@ -2384,24 +2400,137 @@ function delRecipe(i){recipes.splice(i,1);lsSet('mnj_recipes',recipes);renderRec
 // ════════════════════════════════════════
 // EXERCISE
 // ════════════════════════════════════════
-document.getElementById('ex-dur').addEventListener('input',estBurn);
-document.getElementById('ex-type').addEventListener('change',estBurn);
-function estBurn(){const dur=parseInt(document.getElementById('ex-dur').value)||0;const met=parseFloat(document.getElementById('ex-type').value.split('|')[1]||3);document.getElementById('ex-burn-input').value=Math.round(met*58/60*dur)||'';}
+const STEPS_PER_MIN   = 100;   // average walking cadence
+const KCAL_PER_STEP   = 0.04;  // ~136 lb person, flat ground
+
+function getBodyWeightLbs(){
+  return weightLog.length ? weightLog[weightLog.length-1].w : 136.6;
+}
+
+function onExTypeChange(){
+  const isWalking = document.getElementById('ex-type').value.startsWith('Walking');
+  document.getElementById('steps-section').style.display = isWalking ? '' : 'none';
+  if(!isWalking){
+    document.getElementById('ex-steps').value = '';
+  }
+  estBurn();
+}
+
+function setSteps(n){
+  document.getElementById('ex-steps').value = n;
+  onStepsInput();
+}
+
+function onStepsInput(){
+  const steps = parseInt(document.getElementById('ex-steps').value)||0;
+  if(!steps) return;
+  // Auto-fill duration from steps
+  const dur = Math.round(steps / STEPS_PER_MIN);
+  document.getElementById('ex-dur').value = dur || '';
+  // Auto-fill calories from steps (weight-adjusted)
+  const wt = getBodyWeightLbs();
+  const kcal = Math.round(steps * KCAL_PER_STEP * (wt/136.6));
+  document.getElementById('ex-burn-input').value = kcal || '';
+}
+
+function onDurInput(){
+  const isWalking = document.getElementById('ex-type').value.startsWith('Walking');
+  if(isWalking){
+    const dur = parseInt(document.getElementById('ex-dur').value)||0;
+    const steps = dur * STEPS_PER_MIN;
+    if(dur && !document.getElementById('ex-steps').value){
+      document.getElementById('ex-steps').value = steps;
+    }
+  }
+  estBurn();
+}
+
+function estBurn(){
+  const dur = parseInt(document.getElementById('ex-dur').value)||0;
+  const met = parseFloat(document.getElementById('ex-type').value.split('|')[1]||3);
+  const wt  = getBodyWeightLbs();
+  // MET formula: kcal = MET × weight_kg × duration_hours
+  const wtKg = wt * 0.453592;
+  const kcal = Math.round(met * wtKg * (dur/60));
+  if(kcal) document.getElementById('ex-burn-input').value = kcal;
+}
+
+document.getElementById('ex-dur').addEventListener('input', onDurInput);
+document.getElementById('ex-type').addEventListener('change', onExTypeChange);
+// Init — hide steps section for non-walking (walking is default so show it)
+document.getElementById('steps-section').style.display = '';
+
 function logExercise(){
-  const dur=parseInt(document.getElementById('ex-dur').value);if(!dur){showToast('Enter duration');return;}
-  const sel=document.getElementById('ex-type').value.split('|');
-  const burn=parseInt(document.getElementById('ex-burn-input').value)||Math.round(parseFloat(sel[1]||3)*58/60*dur);
-  state.exercises.push({name:sel[0],dur,burn});
-  syncAll(); closeModal('exercise-modal'); renderAll(); showToast(sel[0]+' logged · +'+burn+' kcal');
+  const typeVal = document.getElementById('ex-type').value;
+  const sel     = typeVal.split('|');
+  const isWalking = sel[0] === 'Walking';
+  const steps   = isWalking ? (parseInt(document.getElementById('ex-steps').value)||0) : 0;
+  const dur     = parseInt(document.getElementById('ex-dur').value)||(steps?Math.round(steps/STEPS_PER_MIN):0);
+  if(!dur && !steps){ showToast('Enter steps or duration'); return; }
+  const wt      = getBodyWeightLbs();
+  const wtKg    = wt * 0.453592;
+  const met     = parseFloat(sel[1]||3);
+  const autoBurn = steps
+    ? Math.round(steps * KCAL_PER_STEP * (wt/136.6))
+    : Math.round(met * wtKg * ((dur||30)/60));
+  const burn = parseInt(document.getElementById('ex-burn-input').value)||autoBurn;
+  const entry = {name:sel[0], dur:dur||Math.round(steps/STEPS_PER_MIN), burn};
+  if(steps) entry.steps = steps;
+  state.exercises.push(entry);
+  // Save daily step count
+  if(steps){
+    const todaySteps = (ls('mnj_steps_'+viewDate,0)||0) + steps;
+    lsSet('mnj_steps_'+viewDate, todaySteps);
+  }
+  syncAll(); closeModal('exercise-modal'); renderAll();
+  const stepStr = steps ? ` · ${steps.toLocaleString()} steps` : '';
+  showToast(sel[0]+' logged'+stepStr+' · +'+burn+' kcal');
 }
+
 function renderExercise(){
-  const rows=state.exercises.length?state.exercises.map((e,i)=>`<div class="ex-row"><div><div style="font-size:13px;font-weight:500">${e.name}</div><div style="font-size:11px;color:var(--text3)">${e.dur} min</div></div><div style="display:flex;align-items:center;gap:8px"><span class="tag t-tel">+${e.burn} kcal</span><button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px" onclick="delEx(${i})">×</button></div></div>`).join('')
-  :'<div style="font-size:13px;color:var(--text3);padding:6px 0">No exercise today</div>';
-  document.getElementById('ex-diary-card').style.display=state.exercises.length?'':'none';
-  document.getElementById('ex-diary-list').innerHTML=rows;
-  document.getElementById('ex-more-list').innerHTML=rows;
+  const totalSteps = state.exercises.reduce((s,e)=>s+(e.steps||0),0);
+  const stepGoal   = 10000;
+  const stepPct    = Math.min(Math.round(totalSteps/stepGoal*100),100);
+
+  // Build rows
+  const rows = state.exercises.length
+    ? state.exercises.map((e,i)=>{
+        const stepBadge = e.steps
+          ? `<span class="tag" style="background:var(--teal-l);color:var(--teal)">${e.steps.toLocaleString()} steps</span>`
+          : '';
+        return `<div class="ex-row">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${e.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${e.dur} min${e.steps?' · '+e.steps.toLocaleString()+' steps':''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            ${stepBadge}
+            <span class="tag t-tel">+${e.burn} kcal</span>
+            <button style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 2px" onclick="delEx(${i})">×</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:13px;color:var(--text3);padding:6px 0">No exercise logged today</div>';
+
+  // Steps progress bar (shown if any walking logged)
+  const stepsHtml = totalSteps > 0 ? `
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:600;color:var(--teal)">🚶 ${totalSteps.toLocaleString()} steps today</span>
+        <span style="font-size:11px;color:var(--text3)">${stepPct}% of ${stepGoal.toLocaleString()} goal</span>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${stepPct}%;background:var(--teal);border-radius:99px;transition:width .4s"></div>
+      </div>
+    </div>` : '';
+
+  const fullHtml = stepsHtml + rows;
+  document.getElementById('ex-diary-card').style.display = state.exercises.length ? '' : 'none';
+  document.getElementById('ex-diary-list').innerHTML = fullHtml;
+  document.getElementById('ex-more-list').innerHTML  = fullHtml;
 }
-function delEx(i){state.exercises.splice(i,1);syncAll();renderAll();}
+
+function delEx(i){ state.exercises.splice(i,1); syncAll(); renderAll(); }
 
 // ════════════════════════════════════════
 // WEIGHT GOAL
