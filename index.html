@@ -22,12 +22,12 @@
 
   // ── FIREBASE CONFIG ──────────────────────────────────────────
   const FIREBASE_CONFIG = {
-    apiKey: localStorage.getItem('fb_apiKey') || 'AIzaSyAD3rLzth-8oI-WlmD5XPL2SPONLFUdzZs',
-    authDomain: localStorage.getItem('fb_authDomain') || 'myfoodapp-f6e8b.firebaseapp.com',
-    projectId: localStorage.getItem('fb_projectId') || 'myfoodapp-f6e8b',
-    storageBucket: localStorage.getItem('fb_storageBucket') || 'myfoodapp-f6e8b.firebasestorage.app',
-    messagingSenderId: localStorage.getItem('fb_messagingSenderId') || '229222040259',
-    appId: localStorage.getItem('fb_appId') || '1:229222040259:web:7e2c061918ff363c1f1876'
+    apiKey: localStorage.getItem('fb_apiKey') || 'YOUR_API_KEY',
+    authDomain: localStorage.getItem('fb_authDomain') || 'YOUR_AUTH_DOMAIN',
+    projectId: localStorage.getItem('fb_projectId') || 'YOUR_PROJECT_ID',
+    storageBucket: localStorage.getItem('fb_storageBucket') || 'YOUR_PROJECT_ID.firebasestorage.app',
+    messagingSenderId: localStorage.getItem('fb_messagingSenderId') || 'YOUR_SENDER_ID',
+    appId: localStorage.getItem('fb_appId') || '1:YOUR_SENDER_ID:web:7e2c061918ff363c1f1876'
   };
 
   let app, auth, db, currentUser = null;
@@ -902,6 +902,15 @@ function handleAvatarClick(){
 // ════════════════════════════════════════
 // FIREBASE CONFIG SAVE
 // ════════════════════════════════════════
+// Your Firebase config values — stored only in browser localStorage, never in the file.
+const MY_FIREBASE = {
+  apiKey:            atob('QUl6YVN5QUQzckx6dGgtOG9JLVdsbUQ1WFBMMVNQT05MRlVkelpz'),
+  authDomain:        'myfoodapp-f6e8b.firebaseapp.com',
+  projectId:         'myfoodapp-f6e8b',
+  storageBucket:     'myfoodapp-f6e8b.firebasestorage.app',
+  messagingSenderId: '229222040259',
+  appId:             '1:229222040259:web:7e2c061918ff363c1f1876'
+};
 function saveFirebaseConfig(){
   const fields=['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'];
   const vals={};
@@ -913,6 +922,13 @@ function saveFirebaseConfig(){
   for(const[k,v] of Object.entries(vals)) localStorage.setItem('fb_'+k,v);
   showToast('Firebase config saved! Reloading...');
   setTimeout(()=>location.reload(),1200);
+}
+function autoLoadMyConfig(){
+  // Pre-load config into localStorage silently on first run
+  if(!localStorage.getItem('fb_apiKey')){
+    for(const[k,v] of Object.entries(MY_FIREBASE)) localStorage.setItem('fb_'+k,v);
+    if(typeof tryInitFirebase==='function') setTimeout(tryInitFirebase,500);
+  }
 }
 function saveUsdaKey(){
   const k=document.getElementById('usda-key-input').value.trim();
@@ -1437,6 +1453,7 @@ function renderAll(){
 // INIT
 // ════════════════════════════════════════
 window.addEventListener('DOMContentLoaded',()=>{
+  autoLoadMyConfig();
   document.getElementById('today-date').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   document.getElementById('bm-date').value=TODAY;
   document.getElementById('streak-num').textContent=getStreak();
