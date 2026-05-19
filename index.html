@@ -44,11 +44,12 @@
       onAuthStateChanged(auth, user => {
         currentUser = user;
         window.dispatchEvent(new CustomEvent('authChanged', { detail: user }));
+        // Call updateAuthUI directly — works even if event listener not yet attached
+        if (typeof window.updateAuthUI === 'function') {
+          window.updateAuthUI(user);
+        }
         if (user) {
           loadFromCloud();
-          updateAuthUI(user);
-        } else {
-          updateAuthUI(null);
         }
       });
     } catch(e) {
@@ -72,6 +73,10 @@
       // Dispatch event so main JS can update UI once it's loaded
       window.dispatchEvent(new CustomEvent('authChanged', { detail: result.user }));
       window.dispatchEvent(new CustomEvent('redirectSignIn', { detail: result.user }));
+      // Also call directly in case event listener isn't attached yet
+      if (typeof window.updateAuthUI === 'function') {
+        window.updateAuthUI(result.user);
+      }
     }
   }).catch(e => {
     console.warn('Redirect result error:', e.code, e.message);
@@ -939,6 +944,7 @@ function showCloudSaved(){
 // AUTH UI
 // ════════════════════════════════════════
 function updateAuthUI(user){
+  window.updateAuthUI = updateAuthUI; // ensure always accessible to module script
   // Wait for DOM elements to exist
   const out=document.getElementById('signed-out-view');
   const inn=document.getElementById('signed-in-view');
@@ -1477,26 +1483,28 @@ function saveTargets(){
   const p=parseInt(document.getElementById('tgt-p').value);
   const c=parseInt(document.getElementById('tgt-c').value);
   const f=parseInt(document.getElementById('tgt-f').value);
-  if(!cal||!p||!c||!f){showToast('Fill all fields');return;}
-  targets={cal,p,c,f,w:parseInt(document.getElementById('tgt-w').value)||8};
+  const w=parseInt(document.getElementById('tgt-w').value)||8;
+  if(isNaN(cal)||cal<500){showToast('Enter a valid calorie target (min 500)');return;}
+  if(isNaN(p)||p<10){showToast('Enter a valid protein target (min 10g)');return;}
+  if(isNaN(c)||c<10){showToast('Enter a valid carb target (min 10g)');return;}
+  if(isNaN(f)||f<5){showToast('Enter a valid fat target (min 5g)');return;}
+  targets={cal,p,c,f,w};
   lsSet('mnj_targets',targets);
   if(typeof saveToCloud==='function') saveToCloud('meta/targets',targets);
-  document.getElementById('t-cal').textContent=cal.toLocaleString()+' kcal';
-  document.getElementById('t-pro').textContent=p+'g';
-  document.getElementById('t-car').textContent=c+'g';
-  document.getElementById('t-fat').textContent=f+'g';
-  document.getElementById('avg-goal').textContent=cal.toLocaleString();
-  document.getElementById('avg-pg').textContent=p+'g';
-  // Update target rows in profile section
-  const calRow=document.getElementById('t-cal-row');
-  const proRow=document.getElementById('t-pro-row');
-  const carRow=document.getElementById('t-car-row');
-  const fatRow=document.getElementById('t-fat-row');
-  if(calRow) calRow.innerHTML=cal.toLocaleString()+' kcal <span style="color:var(--text3)">›</span>';
-  if(proRow) proRow.innerHTML=p+'g <span style="color:var(--text3)">›</span>';
-  if(carRow) carRow.innerHTML=c+'g <span style="color:var(--text3)">›</span>';
-  if(fatRow) fatRow.innerHTML=f+'g <span style="color:var(--text3)">›</span>';
-  closeModal('targets-modal'); renderAll(); showToast('Targets updated!');
+  // Update "Daily targets" card in More tab
+  const tCal=document.getElementById('t-cal'); if(tCal) tCal.textContent=cal.toLocaleString()+' kcal';
+  const tPro=document.getElementById('t-pro'); if(tPro) tPro.textContent=p+'g';
+  const tCar=document.getElementById('t-car'); if(tCar) tCar.textContent=c+'g';
+  const tFat=document.getElementById('t-fat'); if(tFat) tFat.textContent=f+'g';
+  // Update Trends averages section
+  const ag=document.getElementById('avg-goal'); if(ag) ag.textContent=cal.toLocaleString();
+  const apg=document.getElementById('avg-pg'); if(apg) apg.textContent=p+'g';
+  // Update "Targets" profile section rows
+  const calRow=document.getElementById('t-cal-row'); if(calRow) calRow.innerHTML=cal.toLocaleString()+' kcal <span style="color:var(--text3)">›</span>';
+  const proRow=document.getElementById('t-pro-row'); if(proRow) proRow.innerHTML=p+'g <span style="color:var(--text3)">›</span>';
+  const carRow=document.getElementById('t-car-row'); if(carRow) carRow.innerHTML=c+'g <span style="color:var(--text3)">›</span>';
+  const fatRow=document.getElementById('t-fat-row'); if(fatRow) fatRow.innerHTML=f+'g <span style="color:var(--text3)">›</span>';
+  closeModal('targets-modal'); renderAll(); showToast('Targets updated ✓');
 }
 
 // ════════════════════════════════════════
@@ -1588,18 +1596,25 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('t-fat').textContent=targets.f+'g';
   if(usdaKey&&usdaKey!=='DEMO_KEY') document.getElementById('key-status').textContent='✓ Custom key active';
   renderAll();
-  // Poll for auth state for 30 seconds after load to catch redirect sign-in
+  // Poll for auth state — catches cases where onAuthStateChanged fires
+  // before the main script event listener is registered (module timing)
   let authPollCount = 0;
   const authPoller = setInterval(() => {
     authPollCount++;
     const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
     const dot = document.getElementById('cloud-dot');
-    if(user && dot && !dot.classList.contains('synced')){
-      updateAuthUI(user);
-      clearInterval(authPoller);
+    if (dot) {
+      if (user && !dot.classList.contains('synced')) {
+        updateAuthUI(user);
+        clearInterval(authPoller);
+      } else if (!user && authPollCount > 3) {
+        // Confirmed signed out — update UI
+        updateAuthUI(null);
+        clearInterval(authPoller);
+      }
     }
-    if(authPollCount > 15) clearInterval(authPoller); // stop after 30s
-  }, 2000);
+    if (authPollCount > 20) clearInterval(authPoller); // stop after ~10s
+  }, 500); // poll every 500ms — much faster than before
 });
 window.addEventListener('authChanged', e => {
   updateAuthUI(e.detail);
