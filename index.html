@@ -319,6 +319,8 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 .toast.show{opacity:1}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .card,.meal-card{animation:fadeIn .25s ease both}
+.wg-btn{padding:10px 6px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text2);border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;text-align:center;line-height:1.4;transition:all .15s}
+.wg-btn-active{background:var(--green-l);color:var(--green);border-color:var(--green-m);font-weight:600}
 </style>
 </head>
 <body>
@@ -627,8 +629,8 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 
         <div class="card">
           <div class="card-title">Targets</div>
-          <div class="setting-row" onclick="openModal('targets-modal')" style="cursor:pointer">
-            <span class="sl">Weight Goal</span><span class="sv">Maintain weight <span style="color:var(--text3)">›</span></span>
+          <div class="setting-row" onclick="openWeightGoalModal()" style="cursor:pointer">
+            <span class="sl">Weight Goal</span><span class="sv" id="weight-goal-row">Maintain weight <span style="color:var(--text3)">›</span></span>
           </div>
           <div class="setting-row" onclick="openModal('targets-modal')" style="cursor:pointer">
             <span class="sl">Macro & Energy Targets</span><span class="sv" id="t-cal-row">1,800 kcal <span style="color:var(--text3)">›</span></span>
@@ -766,6 +768,71 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
     </div>
     <div class="form-group"><label class="form-label">Fat (g total)</label><input class="form-input" type="number" id="rec-f" placeholder="0"></div>
     <button class="btn-primary" onclick="saveRecipe()">Save recipe</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="weight-goal-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('weight-goal-modal')">×</button>
+    <div class="modal-title">Weight Goal</div>
+
+    <div class="form-group">
+      <label class="form-label">My goal</label>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="wg-goal-btns">
+        <button class="wg-btn" data-val="lose" onclick="selectWGGoal('lose',this)">🔽 Lose</button>
+        <button class="wg-btn wg-btn-active" data-val="maintain" onclick="selectWGGoal('maintain',this)">⚖️ Maintain</button>
+        <button class="wg-btn" data-val="gain" onclick="selectWGGoal('gain',this)">🔼 Gain</button>
+      </div>
+    </div>
+
+    <div id="wg-target-section">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Current weight (lbs)</label>
+          <input class="form-input" type="number" step="0.1" id="wg-current" placeholder="136.6" oninput="calcWGCalories()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Target weight (lbs)</label>
+          <input class="form-input" type="number" step="0.1" id="wg-target" placeholder="130" oninput="calcWGCalories()">
+        </div>
+      </div>
+    </div>
+
+    <div id="wg-pace-section">
+      <div class="form-group">
+        <label class="form-label">Pace</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="wg-pace-btns">
+          <button class="wg-btn" data-val="0.5" onclick="selectWGPace(0.5,this)">🐢 Slow<br><span style="font-size:10px">0.5 lb/wk</span></button>
+          <button class="wg-btn wg-btn-active" data-val="1" onclick="selectWGPace(1,this)">🚶 Moderate<br><span style="font-size:10px">1 lb/wk</span></button>
+          <button class="wg-btn" data-val="1.5" onclick="selectWGPace(1.5,this)">🏃 Fast<br><span style="font-size:10px">1.5 lb/wk</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Activity level</label>
+      <select class="form-input" id="wg-activity" onchange="calcWGCalories()">
+        <option value="1.2">Sedentary (desk job, little exercise)</option>
+        <option value="1.375">Lightly active (1–3 days/wk)</option>
+        <option value="1.55" selected>Moderately active (3–5 days/wk)</option>
+        <option value="1.725">Very active (6–7 days/wk)</option>
+        <option value="1.9">Extra active (physical job + exercise)</option>
+      </select>
+    </div>
+
+    <!-- Live preview -->
+    <div id="wg-preview" style="background:var(--green-l);border-radius:var(--rs);padding:14px;margin-bottom:16px;display:none">
+      <div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px">Recommended targets</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+        <div><div style="font-size:11px;color:var(--text2)">Daily calories</div><div style="font-size:18px;font-weight:600;color:var(--green)" id="wg-rec-cal">—</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">Est. time to goal</div><div style="font-size:18px;font-weight:600;color:var(--green)" id="wg-rec-time">—</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">Protein</div><div style="font-size:14px;font-weight:500" id="wg-rec-p">—</div></div>
+        <div><div style="font-size:11px;color:var(--text2)">Carbs / Fat</div><div style="font-size:14px;font-weight:500" id="wg-rec-cf">—</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-top:8px" id="wg-tdee-note"></div>
+    </div>
+
+    <button class="btn-primary" onclick="applyWeightGoal()">Apply these targets</button>
   </div>
 </div>
 
@@ -1458,6 +1525,146 @@ function renderExercise(){
 function delEx(i){state.exercises.splice(i,1);syncAll();renderAll();}
 
 // ════════════════════════════════════════
+// WEIGHT GOAL
+// ════════════════════════════════════════
+let wgGoal = ls('mnj_wg_goal','maintain');   // 'lose' | 'maintain' | 'gain'
+let wgPace = ls('mnj_wg_pace', 1);           // lbs per week
+let wgGoalLabels = {lose:'Lose weight',maintain:'Maintain weight',gain:'Gain weight'};
+
+function openWeightGoalModal(){
+  // Pre-fill current weight from latest log
+  const latest = weightLog.length ? weightLog[weightLog.length-1].w : 136.6;
+  document.getElementById('wg-current').value = latest;
+  document.getElementById('wg-target').value  = ls('mnj_wg_target_lbs', latest);
+  document.getElementById('wg-activity').value = ls('mnj_wg_activity','1.55');
+  // Restore goal button state
+  document.querySelectorAll('#wg-goal-btns .wg-btn').forEach(b=>{
+    b.classList.toggle('wg-btn-active', b.dataset.val===wgGoal);
+  });
+  // Restore pace button state
+  document.querySelectorAll('#wg-pace-btns .wg-btn').forEach(b=>{
+    b.classList.toggle('wg-btn-active', parseFloat(b.dataset.val)===wgPace);
+  });
+  toggleWGPaceSection();
+  calcWGCalories();
+  openModal('weight-goal-modal');
+}
+
+function selectWGGoal(val, btn){
+  wgGoal = val;
+  document.querySelectorAll('#wg-goal-btns .wg-btn').forEach(b=>b.classList.remove('wg-btn-active'));
+  btn.classList.add('wg-btn-active');
+  toggleWGPaceSection();
+  calcWGCalories();
+}
+
+function selectWGPace(val, btn){
+  wgPace = val;
+  document.querySelectorAll('#wg-pace-btns .wg-btn').forEach(b=>b.classList.remove('wg-btn-active'));
+  btn.classList.add('wg-btn-active');
+  calcWGCalories();
+}
+
+function toggleWGPaceSection(){
+  // Hide pace and target weight for maintain
+  const show = wgGoal !== 'maintain';
+  document.getElementById('wg-pace-section').style.display = show ? '' : 'none';
+  document.getElementById('wg-target-section').querySelector('[id="wg-target"]').closest('.form-group').style.display = show ? '' : 'none';
+}
+
+function calcWGCalories(){
+  const curW  = parseFloat(document.getElementById('wg-current').value);
+  const tgtW  = parseFloat(document.getElementById('wg-target').value) || curW;
+  const activ = parseFloat(document.getElementById('wg-activity').value) || 1.55;
+  if(!curW) { document.getElementById('wg-preview').style.display='none'; return; }
+
+  // Mifflin-St Jeor BMR — female, age 57, height 64 inches (162.56 cm)
+  const heightCm = (ls(HEIGHT_KEY,64)) * 2.54;
+  const weightKg = curW * 0.453592;
+  const age = 57;
+  const bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * age) - 161;
+  const tdee = Math.round(bmr * activ);
+
+  // Calorie adjustment: 1 lb fat ≈ 3500 kcal → deficit/surplus per week
+  let dailyAdj = 0;
+  if(wgGoal === 'lose')     dailyAdj = -Math.round(wgPace * 3500 / 7);
+  else if(wgGoal === 'gain') dailyAdj = +Math.round(wgPace * 3500 / 7);
+
+  // Floor: never below 1200 kcal for safety
+  const recCal = Math.max(1200, tdee + dailyAdj);
+
+  // Macro split — vegan-friendly, higher protein
+  // Protein: 0.7g per lb of target body weight (good for vegan)
+  const recP = Math.round((wgGoal==='gain' ? tgtW : curW) * 0.7);
+  // Fat: 25% of calories
+  const recF = Math.round(recCal * 0.25 / 9);
+  // Carbs: remainder
+  const recC = Math.round((recCal - recP*4 - recF*9) / 4);
+
+  // Time to goal
+  let timeStr = '—';
+  if(wgGoal !== 'maintain' && tgtW && curW){
+    const diff = Math.abs(tgtW - curW);
+    const weeks = Math.round(diff / wgPace);
+    if(weeks <= 1) timeStr = '~1 week';
+    else if(weeks < 5) timeStr = '~'+weeks+' wks';
+    else timeStr = '~'+Math.round(weeks/4.33)+' months';
+  } else {
+    timeStr = 'Ongoing';
+  }
+
+  document.getElementById('wg-rec-cal').textContent  = recCal.toLocaleString()+' kcal';
+  document.getElementById('wg-rec-time').textContent = timeStr;
+  document.getElementById('wg-rec-p').textContent    = recP+'g';
+  document.getElementById('wg-rec-cf').textContent   = recC+'g / '+recF+'g';
+  document.getElementById('wg-tdee-note').textContent= 'Your TDEE is ~'+tdee.toLocaleString()+' kcal/day';
+  document.getElementById('wg-preview').style.display = '';
+
+  // Store for apply
+  window._wgRec = {cal:recCal, p:recP, c:recC, f:recF};
+}
+
+function applyWeightGoal(){
+  if(!window._wgRec){ showToast('Enter your weight first'); return; }
+  const {cal,p,c,f} = window._wgRec;
+  const tgtW = parseFloat(document.getElementById('wg-target').value)||null;
+  const activ = document.getElementById('wg-activity').value;
+
+  // Save goal settings
+  lsSet('mnj_wg_goal', wgGoal);
+  lsSet('mnj_wg_pace', wgPace);
+  lsSet('mnj_wg_activity', activ);
+  if(tgtW) lsSet('mnj_wg_target_lbs', tgtW);
+
+  // Apply to targets
+  targets = {...targets, cal, p, c, f};
+  lsSet('mnj_targets', targets);
+  if(typeof saveToCloud==='function') saveToCloud('meta/targets', targets);
+
+  // Update all UI displays
+  const label = wgGoalLabels[wgGoal] + (tgtW && wgGoal!=='maintain' ? ' → '+tgtW+' lbs' : '');
+  const wgRow = document.getElementById('weight-goal-row');
+  if(wgRow) wgRow.innerHTML = label+' <span style="color:var(--text3)">›</span>';
+  applyTargetsToUI(cal,p,c,f);
+  closeModal('weight-goal-modal');
+  renderAll();
+  showToast('Goal set · '+cal.toLocaleString()+' kcal/day');
+}
+
+function applyTargetsToUI(cal,p,c,f){
+  const tCal=document.getElementById('t-cal'); if(tCal) tCal.textContent=cal.toLocaleString()+' kcal';
+  const tPro=document.getElementById('t-pro'); if(tPro) tPro.textContent=p+'g';
+  const tCar=document.getElementById('t-car'); if(tCar) tCar.textContent=c+'g';
+  const tFat=document.getElementById('t-fat'); if(tFat) tFat.textContent=f+'g';
+  const ag=document.getElementById('avg-goal'); if(ag) ag.textContent=cal.toLocaleString();
+  const apg=document.getElementById('avg-pg'); if(apg) apg.textContent=p+'g';
+  const calRow=document.getElementById('t-cal-row'); if(calRow) calRow.innerHTML=cal.toLocaleString()+' kcal <span style="color:var(--text3)">›</span>';
+  const proRow=document.getElementById('t-pro-row'); if(proRow) proRow.innerHTML=p+'g <span style="color:var(--text3)">›</span>';
+  const carRow=document.getElementById('t-car-row'); if(carRow) carRow.innerHTML=c+'g <span style="color:var(--text3)">›</span>';
+  const fatRow=document.getElementById('t-fat-row'); if(fatRow) fatRow.innerHTML=f+'g <span style="color:var(--text3)">›</span>';
+}
+
+// ════════════════════════════════════════
 // TARGETS
 // ════════════════════════════════════════
 function openTargetsModal(){
@@ -1481,19 +1688,7 @@ function saveTargets(){
   targets={cal,p,c,f,w};
   lsSet('mnj_targets',targets);
   if(typeof saveToCloud==='function') saveToCloud('meta/targets',targets);
-  // Update "Daily targets" card in More tab
-  const tCal=document.getElementById('t-cal'); if(tCal) tCal.textContent=cal.toLocaleString()+' kcal';
-  const tPro=document.getElementById('t-pro'); if(tPro) tPro.textContent=p+'g';
-  const tCar=document.getElementById('t-car'); if(tCar) tCar.textContent=c+'g';
-  const tFat=document.getElementById('t-fat'); if(tFat) tFat.textContent=f+'g';
-  // Update Trends averages section
-  const ag=document.getElementById('avg-goal'); if(ag) ag.textContent=cal.toLocaleString();
-  const apg=document.getElementById('avg-pg'); if(apg) apg.textContent=p+'g';
-  // Update "Targets" profile section rows
-  const calRow=document.getElementById('t-cal-row'); if(calRow) calRow.innerHTML=cal.toLocaleString()+' kcal <span style="color:var(--text3)">›</span>';
-  const proRow=document.getElementById('t-pro-row'); if(proRow) proRow.innerHTML=p+'g <span style="color:var(--text3)">›</span>';
-  const carRow=document.getElementById('t-car-row'); if(carRow) carRow.innerHTML=c+'g <span style="color:var(--text3)">›</span>';
-  const fatRow=document.getElementById('t-fat-row'); if(fatRow) fatRow.innerHTML=f+'g <span style="color:var(--text3)">›</span>';
+  applyTargetsToUI(cal,p,c,f);
   closeModal('targets-modal'); renderAll(); showToast('Targets updated ✓');
 }
 
@@ -1585,6 +1780,14 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('t-car').textContent=targets.c+'g';
   document.getElementById('t-fat').textContent=targets.f+'g';
   if(usdaKey&&usdaKey!=='DEMO_KEY') document.getElementById('key-status').textContent='✓ Custom key active';
+  // Restore weight goal label
+  const _savedGoal = ls('mnj_wg_goal','maintain');
+  const _savedTgt  = ls('mnj_wg_target_lbs', null);
+  const _wgRowEl   = document.getElementById('weight-goal-row');
+  if(_wgRowEl){
+    const _lbl = wgGoalLabels[_savedGoal]||'Maintain weight';
+    _wgRowEl.innerHTML = _lbl + (_savedTgt && _savedGoal!=='maintain' ? ' → '+_savedTgt+' lbs' : '') + ' <span style="color:var(--text3)">›</span>';
+  }
   renderAll();
   // Poller: safety net in case onAuthStateChanged fires before globals are ready
   let authPollCount = 0;
