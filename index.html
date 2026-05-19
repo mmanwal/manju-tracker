@@ -46,9 +46,12 @@
         // Defer via setTimeout(0) so the main <script> block always runs first,
         // guaranteeing window.updateAuthUI and other globals are defined
         setTimeout(() => {
+          if (typeof window.authDebug === 'function') window.authDebug('onAuthStateChanged fired, user='+(user?user.email:'null'));
           window.dispatchEvent(new CustomEvent('authChanged', { detail: user }));
           if (typeof window.updateAuthUI === 'function') {
             window.updateAuthUI(user);
+          } else {
+            if (typeof window.authDebug === 'function') window.authDebug('ERROR: window.updateAuthUI not found!');
           }
           if (user && typeof window.loadFromCloud === 'function') {
             window.loadFromCloud();
@@ -684,10 +687,15 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
           <button class="btn-secondary" onclick="alert('Steps:\n1. Open this file in Chrome or Samsung Internet\n2. Tap ⋮ (top right)\n3. Add to Home screen\n4. Tap Add')" style="margin-top:0">📲 Install instructions</button>
         </div>
 
+        <!-- AUTH DEBUG PANEL — remove once dot issue resolved -->
+        <div class="card" style="border:2px solid var(--amber-m)">
+          <div class="card-title" style="color:var(--amber)">🔧 Auth Debug (temporary)</div>
+          <pre id="auth-debug-log" style="font-size:10px;color:var(--text2);white-space:pre-wrap;line-height:1.6;font-family:monospace;margin-bottom:8px">Waiting...</pre>
+          <button class="btn-secondary" style="margin-top:0" onclick="authDebug('ManualCheck user='+(typeof getCurrentUser==='function'?(getCurrentUser()?getCurrentUser().email:'null'):'fn-missing'))">Check auth state now</button>
+        </div>
+
       </div>
     </div>
-
-  </div><!-- /scroll -->
 
   <button class="fab" onclick="openSearch('Meal')" aria-label="Add food"><i class="ti ti-plus"></i></button>
 
@@ -936,21 +944,34 @@ function showCloudSaved(){
 }
 
 // ════════════════════════════════════════
+// AUTH DEBUG LOG
+// ════════════════════════════════════════
+const _authLog=[];
+function authDebug(msg){
+  const t=new Date().toISOString().slice(11,23);
+  _authLog.push(t+' '+msg);
+  const el=document.getElementById('auth-debug-log');
+  if(el) el.textContent=_authLog.slice(-12).join('\n');
+  console.log('[AuthDebug]',msg);
+}
+
+// ════════════════════════════════════════
 // AUTH UI
 // ════════════════════════════════════════
 function updateAuthUI(user){
-  window.updateAuthUI = updateAuthUI; // ensure always accessible to module script
-  // Wait for DOM elements to exist
+  window.updateAuthUI = updateAuthUI;
+  authDebug('updateAuthUI called, user='+(user?user.email:'null'));
   const out=document.getElementById('signed-out-view');
   const inn=document.getElementById('signed-in-view');
   const dot=document.getElementById('cloud-dot');
   const av=document.getElementById('avatar-btn');
-  if(!dot||!av) {
-    // DOM not ready yet, retry in 500ms
-    setTimeout(()=>updateAuthUI(user), 500);
+  if(!dot||!av){
+    authDebug('DOM not ready, retrying...');
+    setTimeout(()=>updateAuthUI(user),200);
     return;
   }
   if(user){
+    authDebug('Setting dot GREEN for '+user.email);
     if(out) out.style.display='none';
     if(inn) inn.style.display='';
     const nameEl=document.getElementById('user-name-display');
@@ -960,17 +981,17 @@ function updateAuthUI(user){
     const pic=document.getElementById('profile-pic-small');
     if(pic&&user.photoURL){pic.innerHTML=`<img src="${user.photoURL}" style="width:100%;height:100%;border-radius:50%">`;}
     if(user.photoURL){av.innerHTML=`<img src="${user.photoURL}">`;}
-    // Force dot green
     dot.classList.add('synced');
     dot.classList.remove('error');
-    dot.style.background='#639922';
+    dot.style.cssText='background:#639922 !important;width:8px;height:8px;border-radius:50%';
     document.getElementById('firebase-setup-card').style.display='none';
   } else {
+    authDebug('Setting dot GREY (no user)');
     if(out) out.style.display='';
     if(inn) inn.style.display='none';
     av.innerHTML='MJ';
     dot.classList.remove('synced','error');
-    dot.style.background='';
+    dot.style.cssText='';
   }
 }
 function handleAvatarClick(){
@@ -1591,25 +1612,22 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('t-fat').textContent=targets.f+'g';
   if(usdaKey&&usdaKey!=='DEMO_KEY') document.getElementById('key-status').textContent='✓ Custom key active';
   renderAll();
-  // Poll for auth state — catches cases where onAuthStateChanged fires
-  // before the main script event listener is registered (module timing)
+  // Poller: safety net only — onAuthStateChanged with setTimeout(0) is primary mechanism
   let authPollCount = 0;
   const authPoller = setInterval(() => {
     authPollCount++;
     const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
     const dot = document.getElementById('cloud-dot');
-    if (dot) {
-      if (user && !dot.classList.contains('synced')) {
-        updateAuthUI(user);
-        clearInterval(authPoller);
-      } else if (!user && authPollCount > 3) {
-        // Confirmed signed out — update UI
-        updateAuthUI(null);
-        clearInterval(authPoller);
-      }
+    authDebug('Poll#'+authPollCount+' user='+(user?user.email:'null')+' dot.synced='+!!(dot&&dot.classList.contains('synced')));
+    if (dot && user && !dot.classList.contains('synced')) {
+      authDebug('Poller: forcing dot green');
+      updateAuthUI(user);
     }
-    if (authPollCount > 20) clearInterval(authPoller); // stop after ~10s
-  }, 500); // poll every 500ms — much faster than before
+    if (authPollCount >= 20) {
+      authDebug('Poller: stopping after 20 polls');
+      clearInterval(authPoller);
+    }
+  }, 500);
 });
 window.addEventListener('authChanged', e => {
   updateAuthUI(e.detail);
