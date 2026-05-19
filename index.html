@@ -334,11 +334,18 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
     <div class="topbar-row">
       <div style="flex:1;min-width:0">
         <div class="greeting" id="greeting-text">Good morning, Manju 🌿</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-          <button onclick="shiftViewDate(-1)" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--text2);font-size:18px;line-height:1">‹</button>
-          <div class="date-str" id="today-date" onclick="openDatePicker()" style="cursor:pointer;flex:1"></div>
-          <button onclick="shiftViewDate(+1)" id="next-day-btn" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--text2);font-size:18px;line-height:1">›</button>
-          <input type="date" id="date-picker-input" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="onDatePickerChange(this.value)">
+        <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+          <button onclick="shiftViewDate(-1)" style="background:none;border:none;cursor:pointer;padding:4px 6px;color:var(--text2);line-height:1;border-radius:8px;flex-shrink:0" title="Previous day">
+            <i class="ti ti-chevron-left" style="font-size:18px"></i>
+          </button>
+          <div class="date-str" id="today-date" onclick="openDatePicker()" style="cursor:pointer;flex:1;min-width:0;font-size:16px"></div>
+          <button onclick="shiftViewDate(+1)" id="next-day-btn" style="background:none;border:none;cursor:pointer;padding:4px 6px;color:var(--text2);line-height:1;border-radius:8px;flex-shrink:0" title="Next day">
+            <i class="ti ti-chevron-right" style="font-size:18px"></i>
+          </button>
+          <!-- Invisible date input — triggered by tapping the date label -->
+          <input type="date" id="date-picker-input"
+            style="position:absolute;left:-9999px;opacity:0;width:1px;height:1px"
+            onchange="onDatePickerChange(this.value)">
         </div>
       </div>
       <div class="auth-row">
@@ -932,7 +939,7 @@ function loadDateView(date){
 
   // Load state for that date (or empty shell for past)
   if(isToday){
-    state = ls('mnj_'+TODAY, {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:5, exercises:[]});
+    state = ls('mnj_'+TODAY, {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:0, exercises:[]});
   } else {
     const saved = ls('mnj_'+viewDate, null);
     state = saved || {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:0, exercises:[]};
@@ -940,8 +947,9 @@ function loadDateView(date){
 
   // Update date label
   const d = new Date(viewDate+'T12:00:00');
-  const label = isToday ? 'Today, '+d.toLocaleDateString('en-US',{month:'long',day:'numeric'})
-    : d.toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric'});
+  const label = isToday
+    ? d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})
+    : d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
   document.getElementById('today-date').textContent = label;
 
   // Show/hide past banner
@@ -954,8 +962,12 @@ function loadDateView(date){
 
   // Disable/enable next-day arrow (can't go beyond today)
   const nextBtn = document.getElementById('next-day-btn');
-  if(nextBtn) nextBtn.style.opacity = (viewDate >= TODAY) ? '0.3' : '1';
-  if(nextBtn) nextBtn.disabled = (viewDate >= TODAY);
+  if(nextBtn){
+    const atToday = viewDate >= TODAY;
+    nextBtn.style.opacity = atToday ? '0.25' : '1';
+    nextBtn.style.pointerEvents = atToday ? 'none' : '';
+    nextBtn.disabled = atToday;
+  }
 
   renderAll();
 }
@@ -972,9 +984,15 @@ function openDatePicker(){
   const inp = document.getElementById('date-picker-input');
   inp.max = TODAY;
   inp.value = viewDate;
-  inp.style.pointerEvents = 'auto';
+  // Try native showPicker() first (Chrome/Samsung Internet modern)
+  if(inp.showPicker) {
+    try { inp.showPicker(); return; } catch(e) {}
+  }
+  // Fallback: temporarily make visible and click
+  inp.style.cssText = 'position:fixed;top:60px;left:16px;width:180px;height:36px;opacity:0.01;z-index:9999;font-size:16px';
+  inp.focus();
   inp.click();
-  setTimeout(()=>inp.style.pointerEvents='none', 500);
+  setTimeout(()=>{ inp.style.cssText = 'position:absolute;left:-9999px;opacity:0;width:1px;height:1px'; }, 1000);
 }
 function onDatePickerChange(val){
   if(!val||val>TODAY) return;
@@ -992,11 +1010,14 @@ const DEF_MEALS = [
 ];
 
 let state = ls('mnj_'+TODAY, {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:0, exercises:[]});
-// If today's saved state still has the old sample foods, reset to blank
+// Reset if today's state has old sample foods OR the old default water=5 with no real food logged
 (function(){
   const sampleFoodName = 'Oats with banana & almond milk';
-  if(state.meals && state.meals[0] && state.meals[0].foods &&
-     state.meals[0].foods.length && state.meals[0].foods[0].name === sampleFoodName){
+  const hasOldFood = state.meals && state.meals[0] && state.meals[0].foods &&
+     state.meals[0].foods.length && state.meals[0].foods[0].name === sampleFoodName;
+  const totalFoods = state.meals ? state.meals.reduce((s,m)=>s+(m.foods?m.foods.length:0),0) : 0;
+  const hasOldWater = state.water === 5 && totalFoods === 0;
+  if(hasOldFood || hasOldWater){
     state = {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:0, exercises:[]};
     lsSet('mnj_'+TODAY, state);
   }
