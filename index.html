@@ -321,6 +321,9 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 .card,.meal-card{animation:fadeIn .25s ease both}
 .wg-btn{padding:10px 6px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text2);border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;text-align:center;line-height:1.4;transition:all .15s}
 .wg-btn-active{background:var(--green-l);color:var(--green);border-color:var(--green-m);font-weight:600}
+.date-nav-btn{background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text2);font-size:20px;line-height:1;border-radius:6px}
+.date-nav-btn:active{background:var(--border)}
+.repeat-meal-btn{display:flex;align-items:center;gap:6px;width:100%;padding:9px 14px;color:var(--teal);font-size:12px;font-family:'DM Sans',sans-serif;background:var(--teal-l);border:none;border-top:1px solid var(--border);cursor:pointer;font-weight:500}
 </style>
 </head>
 <body>
@@ -330,8 +333,13 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
   <div class="topbar">
     <div class="topbar-row">
       <div style="flex:1;min-width:0">
-        <div class="greeting">Good morning, Manju 🌿</div>
-        <div class="date-str" id="today-date"></div>
+        <div class="greeting" id="greeting-text">Good morning, Manju 🌿</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+          <button onclick="shiftViewDate(-1)" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--text2);font-size:18px;line-height:1">‹</button>
+          <div class="date-str" id="today-date" onclick="openDatePicker()" style="cursor:pointer;flex:1"></div>
+          <button onclick="shiftViewDate(+1)" id="next-day-btn" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--text2);font-size:18px;line-height:1">›</button>
+          <input type="date" id="date-picker-input" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" onchange="onDatePickerChange(this.value)">
+        </div>
       </div>
       <div class="auth-row">
         <div class="cloud-dot" id="cloud-dot" title="Cloud sync status"></div>
@@ -344,6 +352,13 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 
     <!-- ══ DIARY ══ -->
     <div id="page-diary" class="page active">
+
+      <!-- Past date banner (hidden when viewing today) -->
+      <div id="past-date-banner" style="display:none;background:var(--amber-l);border-bottom:1px solid var(--amber-m);padding:10px 16px;align-items:center;justify-content:space-between">
+        <span style="font-size:13px;color:var(--amber);font-weight:500">📅 Viewing past log — read only</span>
+        <button onclick="goToToday()" style="font-size:12px;font-weight:600;color:var(--amber);background:none;border:1.5px solid var(--amber-m);border-radius:99px;padding:4px 12px;cursor:pointer;font-family:'DM Sans',sans-serif">Go to today</button>
+      </div>
+
       <div class="sec">
         <div class="card">
           <div class="card-title">Today's calories</div>
@@ -372,7 +387,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
         <div class="card">
           <div class="card-title">Water intake</div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div><span style="font-size:22px;font-weight:600;color:var(--teal)" id="water-num">5</span><span style="font-size:13px;color:var(--text2)"> / 8 glasses</span></div>
+            <div><span style="font-size:22px;font-weight:600;color:var(--teal)" id="water-num">0</span><span style="font-size:13px;color:var(--text2)"> / 8 glasses</span></div>
             <span class="tag t-tel" id="water-tag">On track 💧</span>
           </div>
           <div class="water-cups" id="water-cups"></div>
@@ -883,6 +898,15 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
   </div>
 </div>
 
+<div class="modal-overlay" id="repeat-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('repeat-modal')">×</button>
+    <div class="modal-title" id="repeat-modal-title">Repeat a meal</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Pick a day to copy from — foods will be added to today's log.</div>
+    <div id="repeat-modal-body"></div>
+  </div>
+</div>
+
 <div class="cloud-flash" id="cloud-flash">☁️ Saved</div>
 <div class="toast" id="toast"></div>
 
@@ -893,20 +917,90 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 const TODAY = new Date().toISOString().slice(0,10);
 const HEIGHT_KEY = 'mnj_height';
 
+// ── DATE NAVIGATION ──────────────────────────────────
+let viewDate = TODAY;  // the date currently being viewed in the diary
+
+function getDateOffset(days, fromDate){
+  const d = new Date(fromDate || viewDate);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0,10);
+}
+
+function loadDateView(date){
+  viewDate = date;
+  const isToday = viewDate === TODAY;
+
+  // Load state for that date (or empty shell for past)
+  if(isToday){
+    state = ls('mnj_'+TODAY, {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:5, exercises:[]});
+  } else {
+    const saved = ls('mnj_'+viewDate, null);
+    state = saved || {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:0, exercises:[]};
+  }
+
+  // Update date label
+  const d = new Date(viewDate+'T12:00:00');
+  const label = isToday ? 'Today, '+d.toLocaleDateString('en-US',{month:'long',day:'numeric'})
+    : d.toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric'});
+  document.getElementById('today-date').textContent = label;
+
+  // Show/hide past banner
+  const banner = document.getElementById('past-date-banner');
+  if(banner) banner.style.display = isToday ? 'none' : 'flex';
+
+  // Hide/show FAB (can't add food in past view)
+  const fab = document.querySelector('.fab');
+  if(fab) fab.style.display = isToday ? '' : 'none';
+
+  // Disable/enable next-day arrow (can't go beyond today)
+  const nextBtn = document.getElementById('next-day-btn');
+  if(nextBtn) nextBtn.style.opacity = (viewDate >= TODAY) ? '0.3' : '1';
+  if(nextBtn) nextBtn.disabled = (viewDate >= TODAY);
+
+  renderAll();
+}
+
+function shiftViewDate(delta){
+  const newDate = getDateOffset(delta);
+  if(newDate > TODAY) return; // can't go to future
+  loadDateView(newDate);
+}
+
+function goToToday(){ loadDateView(TODAY); }
+
+function openDatePicker(){
+  const inp = document.getElementById('date-picker-input');
+  inp.max = TODAY;
+  inp.value = viewDate;
+  inp.style.pointerEvents = 'auto';
+  inp.click();
+  setTimeout(()=>inp.style.pointerEvents='none', 500);
+}
+function onDatePickerChange(val){
+  if(!val||val>TODAY) return;
+  loadDateView(val);
+}
+
 function ls(k,d){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):d}catch(e){return d}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
 
 const DEF_MEALS = [
-  {id:'breakfast',label:'Breakfast',icon:'ti-sun',iconBg:'#FAEEDA',iconColor:'#BA7517',
-   foods:[{name:'Oats with banana & almond milk',detail:'1 bowl',kcal:310,p:8,c:60,f:6},{name:'Mixed berries',detail:'100g',kcal:60,p:1,c:14,f:1},{name:'Flaxseeds',detail:'1 tbsp',kcal:55,p:2,c:3,f:4}]},
-  {id:'lunch',label:'Lunch',icon:'ti-bowl',iconBg:'#EAF3DE',iconColor:'#3B6D11',
-   foods:[{name:'Dal makhani (vegan)',detail:'1 cup',kcal:280,p:12,c:38,f:8},{name:'Brown rice',detail:'150g cooked',kcal:165,p:3,c:35,f:1},{name:'Coconut yogurt raita',detail:'50g',kcal:35,p:1,c:4,f:2}]},
-  {id:'dinner',label:'Dinner',icon:'ti-moon',iconBg:'#EEEDFE',iconColor:'#534AB7',
-   foods:[{name:'Palak tofu',detail:'1 cup',kcal:220,p:14,c:10,f:12},{name:'Multigrain roti',detail:'2 rotis',kcal:120,p:4,c:24,f:2}]},
+  {id:'breakfast',label:'Breakfast',icon:'ti-sun',iconBg:'#FAEEDA',iconColor:'#BA7517',foods:[]},
+  {id:'lunch',label:'Lunch',icon:'ti-bowl',iconBg:'#EAF3DE',iconColor:'#3B6D11',foods:[]},
+  {id:'dinner',label:'Dinner',icon:'ti-moon',iconBg:'#EEEDFE',iconColor:'#534AB7',foods:[]},
   {id:'snacks',label:'Snacks',icon:'ti-apple',iconBg:'#FCEBEB',iconColor:'#A32D2D',foods:[]}
 ];
 
-let state = ls('mnj_'+TODAY, {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:5, exercises:[]});
+let state = ls('mnj_'+TODAY, {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:0, exercises:[]});
+// If today's saved state still has the old sample foods, reset to blank
+(function(){
+  const sampleFoodName = 'Oats with banana & almond milk';
+  if(state.meals && state.meals[0] && state.meals[0].foods &&
+     state.meals[0].foods.length && state.meals[0].foods[0].name === sampleFoodName){
+    state = {meals:JSON.parse(JSON.stringify(DEF_MEALS)), water:0, exercises:[]};
+    lsSet('mnj_'+TODAY, state);
+  }
+})();
 let targets = ls('mnj_targets', {cal:1800,p:70,c:200,f:55,w:8});
 let weightLog = ls('mnj_weight', []);
 let bodyMetrics = ls('mnj_bodymetrics', {});
@@ -989,8 +1083,9 @@ const LOCAL_FOODS = [
 // ════════════════════════════════════════
 // SAVE / SYNC
 // ════════════════════════════════════════
-function saveLocal(){lsSet('mnj_'+TODAY,state)}
+function saveLocal(){if(viewDate===TODAY) lsSet('mnj_'+TODAY,state);}
 async function syncAll(){
+  if(viewDate!==TODAY) return; // never overwrite past dates
   saveLocal();
   if(typeof syncToCloud==='function') await syncToCloud();
   else showCloudSaved();
@@ -1145,6 +1240,8 @@ function renderWater(){
 // ════════════════════════════════════════
 function renderMeals(){
   const cont=document.getElementById('meals-container'); cont.innerHTML='';
+  const isPast = viewDate !== TODAY;
+
   state.meals.forEach((meal,mi)=>{
     const total=meal.foods.reduce((s,f)=>s+f.kcal,0);
     const foods=meal.foods.map((f,fi)=>`
@@ -1154,8 +1251,17 @@ function renderMeals(){
           <div class="food-dt">${f.detail||''}${f.p?` · P:${f.p} C:${f.c} F:${f.f}`:''}</div>
         </div>
         <span class="food-kc">${f.kcal}</span>
-        <button class="del-food" onclick="delFood(${mi},${fi})">×</button>
+        ${isPast?'':'<button class="del-food" onclick="delFood('+mi+','+fi+')">×</button>'}
       </div>`).join('');
+
+    // Repeat button — always shown when viewing today
+    const repeatBtn = !isPast ? `
+      <button class="repeat-meal-btn" onclick="openRepeatModal('${meal.id}','${meal.label}')">
+        <i class="ti ti-history" style="font-size:13px"></i> Repeat a previous meal
+      </button>` : '';
+
+    const addBtn = isPast ? '' : `<button class="add-btn" onclick="openSearch('${meal.label}')"><i class="ti ti-plus" style="font-size:16px"></i> Add food</button>`;
+
     const div=document.createElement('div'); div.className='meal-card';
     div.innerHTML=`
       <div class="meal-hdr" onclick="toggleMeal('mb-${meal.id}')">
@@ -1165,14 +1271,66 @@ function renderMeals(){
         </div>
         <span class="meal-kcal">${total>0?total+' kcal':'Empty'}</span>
       </div>
-      <div class="meal-body" id="mb-${meal.id}">${foods}
-        <button class="add-btn" onclick="openSearch('${meal.label}')"><i class="ti ti-plus" style="font-size:16px"></i> Add food</button>
+      <div class="meal-body" id="mb-${meal.id}">${foods}${repeatBtn}${addBtn}
       </div>`;
     cont.appendChild(div);
   });
 }
 function toggleMeal(id){const b=document.getElementById(id);b.style.display=b.style.display==='none'?'':'none';}
-function delFood(mi,fi){state.meals[mi].foods.splice(fi,1);syncAll();renderAll();}
+function delFood(mi,fi){
+  if(viewDate!==TODAY){showToast('Cannot edit past logs');return;}
+  state.meals[mi].foods.splice(fi,1);syncAll();renderAll();
+}
+function openRepeatModal(mealId, mealLabel){
+  if(viewDate!==TODAY){showToast('Cannot edit past logs');return;}
+  // Scan last 14 days for entries that had food in this meal
+  const days=[];
+  for(let i=1;i<=14;i++){
+    const d=getDateOffset(-i, TODAY);
+    const saved=ls('mnj_'+d, null);
+    if(!saved||!saved.meals) continue;
+    const m=saved.meals.find(x=>x.id===mealId);
+    if(m&&m.foods&&m.foods.length){
+      days.push({date:d, foods:m.foods, total:m.foods.reduce((s,f)=>s+f.kcal,0)});
+    }
+  }
+  const body=document.getElementById('repeat-modal-body');
+  const title=document.getElementById('repeat-modal-title');
+  title.textContent='Repeat '+mealLabel;
+  if(!days.length){
+    body.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">No logged data found in the last 14 days for this meal.</div>';
+  } else {
+    body.innerHTML=days.map(d=>{
+      const dt=new Date(d.date+'T12:00:00');
+      const label=dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+      const items=d.foods.slice(0,3).map(f=>`<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>`).join('');
+      const more=d.foods.length>3?`<div style="font-size:11px;color:var(--text3)">+${d.foods.length-3} more</div>`:'';
+      return `<div style="background:var(--bg);border-radius:var(--rs);padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">${label}</div>
+          ${items}${more}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:13px;font-weight:600;color:var(--green)">${d.total} kcal</div>
+          <button class="pill" style="margin-top:6px" onclick="applyRepeat('${mealId}','${d.date}')">Add all</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  openModal('repeat-modal');
+}
+function applyRepeat(mealId, fromDate){
+  const saved=ls('mnj_'+fromDate,null);
+  if(!saved||!saved.meals){showToast('No data found');return;}
+  const srcMeal=saved.meals.find(m=>m.id===mealId);
+  if(!srcMeal||!srcMeal.foods.length){showToast('No foods found');return;}
+  const todayMeal=state.meals.find(m=>m.id===mealId);
+  if(!todayMeal)return;
+  srcMeal.foods.forEach(f=>todayMeal.foods.push({...f}));
+  syncAll(); renderAll();
+  closeModal('repeat-modal');
+  showToast(srcMeal.foods.length+' item'+(srcMeal.foods.length>1?'s':'')+' added ✓');
+}
 
 // ════════════════════════════════════════
 // BODY METRICS
@@ -1720,6 +1878,7 @@ function setPage(name,btn){
   if(name==='trends')renderTrends();
 }
 function openSearch(mealName){
+  if(viewDate!==TODAY){showToast('Cannot add food to past logs');return;}
   prevPage=document.querySelector('.page.active').id.replace('page-','');
   searchMealName=mealName;
   document.getElementById('search-meal-lbl').textContent=mealName;
@@ -1772,7 +1931,6 @@ function renderAll(){
 // ════════════════════════════════════════
 window.addEventListener('DOMContentLoaded',()=>{
   autoLoadMyConfig();
-  document.getElementById('today-date').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   document.getElementById('bm-date').value=TODAY;
   document.getElementById('streak-num').textContent=getStreak();
   document.getElementById('t-cal').textContent=targets.cal.toLocaleString()+' kcal';
@@ -1788,7 +1946,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     const _lbl = wgGoalLabels[_savedGoal]||'Maintain weight';
     _wgRowEl.innerHTML = _lbl + (_savedTgt && _savedGoal!=='maintain' ? ' → '+_savedTgt+' lbs' : '') + ' <span style="color:var(--text3)">›</span>';
   }
-  renderAll();
+  loadDateView(TODAY); // sets date label, banner, and calls renderAll()
   // Poller: safety net in case onAuthStateChanged fires before globals are ready
   let authPollCount = 0;
   const authPoller = setInterval(() => {
