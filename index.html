@@ -15,7 +15,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged }
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
   import { getFirestore, doc, setDoc, getDoc, collection, getDocs, orderBy, query, limit }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -43,14 +43,17 @@
 
       onAuthStateChanged(auth, user => {
         currentUser = user;
-        window.dispatchEvent(new CustomEvent('authChanged', { detail: user }));
-        // Call updateAuthUI directly — works even if event listener not yet attached
-        if (typeof window.updateAuthUI === 'function') {
-          window.updateAuthUI(user);
-        }
-        if (user) {
-          loadFromCloud();
-        }
+        // Defer via setTimeout(0) so the main <script> block always runs first,
+        // guaranteeing window.updateAuthUI and other globals are defined
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('authChanged', { detail: user }));
+          if (typeof window.updateAuthUI === 'function') {
+            window.updateAuthUI(user);
+          }
+          if (user && typeof window.loadFromCloud === 'function') {
+            window.loadFromCloud();
+          }
+        }, 0);
       });
     } catch(e) {
       console.warn('Firebase init failed:', e.message);
@@ -61,26 +64,18 @@
     if (!firebaseReady) { alert('Set up Firebase config first (More → Cloud Sync Setup)'); return; }
     try {
       const provider = new GoogleAuthProvider();
-      // Use redirect instead of popup — works on all browsers and GitHub Pages
-      await signInWithRedirect(auth, provider);
-    } catch(e) { showToast('Sign-in failed: ' + e.message); }
-  };
-
-  // Handle redirect result when user comes back after Google sign-in
-  getRedirectResult(auth).then(result => {
-    if (result && result.user) {
-      currentUser = result.user;
-      // Dispatch event so main JS can update UI once it's loaded
-      window.dispatchEvent(new CustomEvent('authChanged', { detail: result.user }));
-      window.dispatchEvent(new CustomEvent('redirectSignIn', { detail: result.user }));
-      // Also call directly in case event listener isn't attached yet
-      if (typeof window.updateAuthUI === 'function') {
-        window.updateAuthUI(result.user);
+      // Popup works reliably on GitHub Pages and Samsung Internet (no redirect timing issues)
+      await signInWithPopup(auth, provider);
+      // onAuthStateChanged will fire automatically after popup completes
+    } catch(e) {
+      if (e.code !== 'auth/popup-closed-by-user') {
+        showToast('Sign-in failed: ' + e.message);
       }
     }
-  }).catch(e => {
-    console.warn('Redirect result error:', e.code, e.message);
-  });
+  };
+
+
+
 
 
   window.fbSignOut = async () => {
@@ -1620,13 +1615,8 @@ window.addEventListener('authChanged', e => {
   updateAuthUI(e.detail);
 });
 
-// Handle coming back from Google redirect sign-in
-window.addEventListener('redirectSignIn', e => {
-  const user = e.detail;
-  updateAuthUI(user);
-  loadFromCloud();
-  setTimeout(() => showToast('Welcome back, ' + (user.displayName || 'Manju') + '! ☁️'), 500);
-});
+
+
 </script>
 </body>
 </html>
