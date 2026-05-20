@@ -412,7 +412,30 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
     <div id="page-nutrients" class="page">
       <div class="sec">
 
-        <!-- Vitamins & Supplements Log -->
+        <!-- ✨ ORACLE -->
+        <div class="card" style="background:linear-gradient(135deg,var(--green-l) 0%,var(--teal-l) 100%);border:1.5px solid var(--green-m)">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div style="width:36px;height:36px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <i class="ti ti-sparkles" style="color:white;font-size:18px"></i>
+            </div>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:var(--green)">Oracle Nutrient Search</div>
+              <div style="font-size:11px;color:var(--text2)">Find the best vegan foods for any nutrient</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div style="position:relative;flex:1">
+              <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px"></i>
+              <input id="oracle-input" class="form-input" style="padding-left:32px;font-size:13px" placeholder="e.g. Iron, Vitamin B12, Calcium…" oninput="oracleInputChange()" onfocus="oracleInputChange()">
+            </div>
+            <button class="btn-primary" style="flex-shrink:0;padding:0 16px" onclick="runOracle()">Ask</button>
+          </div>
+          <!-- Quick nutrient chips -->
+          <div id="oracle-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
+        </div>
+
+        <!-- Oracle results -->
+        <div id="oracle-results" style="display:none"></div>
         <div class="card">
           <div class="card-title">Vitamins & Supplements — today</div>
           <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Tap to mark as taken</div>
@@ -2141,7 +2164,12 @@ function renderNutrients(){
     const pct = estimateNutrientPct(n.key);
     const bar = Math.min(pct,100);
     const label = eaten===0 ? '0%' : pct+'%';
-    return `<div class="nut-row"><div class="nut-nm">${n.name}</div><div class="nut-bar"><div class="nut-fill" style="width:${bar}%;background:${n.color}"></div></div><div class="nut-pct">${label}</div></div>`;
+    const lowFlag = pct < 60;
+    return `<div class="nut-row" onclick="triggerOracle('${n.name}')" style="cursor:pointer" title="Tap to find best foods for ${n.name}">
+      <div class="nut-nm" style="${lowFlag?'color:var(--red)':''}">${n.name}${lowFlag?' ↗':''}</div>
+      <div class="nut-bar"><div class="nut-fill" style="width:${bar}%;background:${n.color}"></div></div>
+      <div class="nut-pct" style="${lowFlag?'color:var(--red)':''}">${label}</div>
+    </div>`;
   }).join('');
 
   // Dynamic tags
@@ -3369,6 +3397,131 @@ function toggleReorderMode(){
     el.style.pointerEvents = reorderMode ? 'auto' : 'none';
   });
 }
+
+// ════════════════════════════════════════
+// ORACLE NUTRIENT SEARCH
+// ════════════════════════════════════════
+
+const ORACLE_DB = {
+  'iron':        {unit:'mg',rdi:8,icon:'🩸',color:'#A32D2D',tip:'Pair with Vitamin C (lemon juice, amla, bell pepper) to boost non-heme iron absorption by up to 3×. Avoid tea/coffee within 1 hour of eating.',foods:[{name:'Lentils, cooked (1 cup)',amount:'6.6 mg',kcal:230,ref:'Red lentils (cooked)'},{name:'Tofu, firm (100g)',amount:'5.4 mg',kcal:76,ref:'Tofu (firm)'},{name:'Spinach, cooked (1 cup)',amount:'6.4 mg',kcal:41,ref:'Spinach (raw)'},{name:'Tempeh (100g)',amount:'2.7 mg',kcal:195,ref:'Tempeh'},{name:'Chickpeas (½ cup)',amount:'2.4 mg',kcal:135,ref:'Chickpeas (cooked)'},{name:'Pumpkin seeds (28g)',amount:'2.5 mg',kcal:151,ref:'Pumpkin seeds'},{name:'Quinoa (1 cup)',amount:'2.8 mg',kcal:222,ref:'Quinoa (cooked)'},{name:'Dark chocolate 70% (30g)',amount:'3.4 mg',kcal:170,ref:'Dark chocolate 70%'},{name:'Kidney beans (½ cup)',amount:'2.6 mg',kcal:127,ref:'Kidney beans (cooked)'},{name:'Hemp seeds (3 tbsp)',amount:'2.4 mg',kcal:166,ref:'Hemp seeds'}]},
+  'calcium':     {unit:'mg',rdi:1200,icon:'🦴',color:'#639922',tip:'Vitamin D is essential for calcium absorption. Use kale or bok choy — not spinach — as a calcium source (oxalates block absorption from spinach). Spread across meals.',foods:[{name:'Tofu, calcium-set (100g)',amount:'350 mg',kcal:76,ref:'Tofu (firm)'},{name:'Fortified oat milk (240ml)',amount:'350 mg',kcal:120,ref:'Oat milk'},{name:'Fortified almond milk (240ml)',amount:'450 mg',kcal:30,ref:'Almond milk (unsweetened)'},{name:'Chia seeds (2 tbsp)',amount:'179 mg',kcal:138,ref:'Chia seeds'},{name:'Tempeh (100g)',amount:'111 mg',kcal:195,ref:'Tempeh'},{name:'Kale (1 cup)',amount:'90 mg',kcal:33,ref:'Kale (raw)'},{name:'Tahini (2 tbsp)',amount:'130 mg',kcal:178,ref:'Tahini'},{name:'Almonds (28g)',amount:'76 mg',kcal:164,ref:'Almonds'},{name:'Edamame (1 cup)',amount:'98 mg',kcal:121,ref:'Edamame'},{name:'Broccoli (1 cup)',amount:'62 mg',kcal:55,ref:'Broccoli'}]},
+  'vitamin b12': {unit:'mcg',rdi:2.4,icon:'⚡',color:'#A32D2D',tip:'B12 is the most critical vegan supplement. Supplement 1000 mcg cyanocobalamin daily — do not rely on food alone. Nutritional yeast is the best food source, but amounts vary by brand.',foods:[{name:'Nutritional yeast (2 tbsp)',amount:'2.4–3.0 mcg',kcal:60,ref:'Nutritional yeast'},{name:'Fortified soy milk (240ml)',amount:'3.0 mcg',kcal:80,ref:'Soy milk'},{name:'Fortified oat milk (240ml)',amount:'1.2 mcg',kcal:120,ref:'Oat milk'},{name:'Fortified almond milk (240ml)',amount:'1.5 mcg',kcal:30,ref:'Almond milk (unsweetened)'},{name:'Tempeh (100g)',amount:'0.1 mcg',kcal:195,ref:'Tempeh'}]},
+  'vitamin d':   {unit:'mcg',rdi:20,icon:'☀️',color:'#BA7517',tip:'Chicago sun is insufficient Oct–April. Supplement with 1000–2000 IU lichen-based D3. Take with a meal containing fat for best absorption. Get blood levels checked annually.',foods:[{name:'UV-exposed mushrooms (100g)',amount:'7–26 mcg',kcal:21,ref:'Mushrooms'},{name:'Fortified oat milk (240ml)',amount:'2.5 mcg',kcal:120,ref:'Oat milk'},{name:'Fortified almond milk (240ml)',amount:'2.5 mcg',kcal:30,ref:'Almond milk (unsweetened)'},{name:'Fortified soy milk (240ml)',amount:'2.9 mcg',kcal:80,ref:'Soy milk'},{name:'D3 supplement (1000 IU)',amount:'25 mcg',kcal:0,ref:null}]},
+  'omega-3':     {unit:'g',rdi:1.1,icon:'🐟',color:'#0F6E56',tip:'ALA from plants converts poorly to DHA/EPA (~5%). Take algae DHA/EPA 250–500mg daily. Reduce omega-6 oils (sunflower, corn) to improve the ratio.',foods:[{name:'Chia seeds (2 tbsp)',amount:'5.0g ALA',kcal:138,ref:'Chia seeds'},{name:'Flaxseeds, ground (2 tbsp)',amount:'3.2g ALA',kcal:74,ref:'Flaxseeds (ground)'},{name:'Hemp seeds (3 tbsp)',amount:'2.5g ALA',kcal:166,ref:'Hemp seeds'},{name:'Walnuts (28g)',amount:'2.6g ALA',kcal:185,ref:'Walnuts'},{name:'Edamame (1 cup)',amount:'0.6g ALA',kcal:121,ref:'Edamame'},{name:'Algae DHA/EPA supplement',amount:'250–500mg DHA+EPA',kcal:0,ref:null}]},
+  'zinc':        {unit:'mg',rdi:8,icon:'🔋',color:'#BA7517',tip:'Plant zinc is blocked by phytates. Soak and sprout legumes before cooking. Aim for ~12mg (50% more than RDI). Leavened breads have more bioavailable zinc than flatbreads.',foods:[{name:'Hemp seeds (3 tbsp)',amount:'2.9 mg',kcal:166,ref:'Hemp seeds'},{name:'Pumpkin seeds (28g)',amount:'2.2 mg',kcal:151,ref:'Pumpkin seeds'},{name:'Tempeh (100g)',amount:'1.7 mg',kcal:195,ref:'Tempeh'},{name:'Cashews (28g)',amount:'1.6 mg',kcal:157,ref:'Cashews'},{name:'Lentils (1 cup)',amount:'2.5 mg',kcal:230,ref:'Red lentils (cooked)'},{name:'Quinoa (1 cup)',amount:'2.0 mg',kcal:222,ref:'Quinoa (cooked)'},{name:'Chickpeas (½ cup)',amount:'1.3 mg',kcal:135,ref:'Chickpeas (cooked)'},{name:'Oats, rolled ½ cup dry',amount:'1.5 mg',kcal:150,ref:'Oats (rolled, dry)'},{name:'Almonds (28g)',amount:'0.9 mg',kcal:164,ref:'Almonds'}]},
+  'magnesium':   {unit:'mg',rdi:320,icon:'💚',color:'#639922',tip:'Stress and refined foods deplete magnesium. Dark chocolate and leafy greens are best sources. Magnesium glycinate before bed improves sleep quality.',foods:[{name:'Hemp seeds (3 tbsp)',amount:'210 mg',kcal:166,ref:'Hemp seeds'},{name:'Dark chocolate 70% (30g)',amount:'64 mg',kcal:170,ref:'Dark chocolate 70%'},{name:'Pumpkin seeds (28g)',amount:'156 mg',kcal:151,ref:'Pumpkin seeds'},{name:'Spinach, cooked (1 cup)',amount:'157 mg',kcal:41,ref:'Spinach (raw)'},{name:'Quinoa (1 cup)',amount:'118 mg',kcal:222,ref:'Quinoa (cooked)'},{name:'Chia seeds (2 tbsp)',amount:'95 mg',kcal:138,ref:'Chia seeds'},{name:'Almonds (28g)',amount:'76 mg',kcal:164,ref:'Almonds'},{name:'Black beans (½ cup)',amount:'60 mg',kcal:114,ref:'Black beans (cooked)'},{name:'Avocado (½)',amount:'29 mg',kcal:80,ref:'Avocado'}]},
+  'potassium':   {unit:'mg',rdi:2600,icon:'🍌',color:'#639922',tip:'Most people are low in potassium. Eat a variety of fruits and vegetables daily. Potassium helps lower blood pressure — especially important alongside sodium reduction.',foods:[{name:'Spinach, cooked (1 cup)',amount:'839 mg',kcal:41,ref:'Spinach (raw)'},{name:'Coconut water (240ml)',amount:'600 mg',kcal:46,ref:'Coconut water'},{name:'Sweet potato (1 medium)',amount:'542 mg',kcal:103,ref:'Sweet potato (baked)'},{name:'Lentils (1 cup)',amount:'731 mg',kcal:230,ref:'Red lentils (cooked)'},{name:'Avocado (½)',amount:'487 mg',kcal:80,ref:'Avocado'},{name:'Banana (1 medium)',amount:'422 mg',kcal:89,ref:'Banana'},{name:'Beetroot (1 cup)',amount:'518 mg',kcal:75,ref:'Beetroot'},{name:'Edamame (1 cup)',amount:'676 mg',kcal:121,ref:'Edamame'}]},
+  'vitamin c':   {unit:'mg',rdi:75,icon:'🍊',color:'#BA7517',tip:'Vitamin C is destroyed by heat — eat some raw fruit or veg daily. It boosts iron absorption from plant foods dramatically — squeeze lemon on dal and spinach.',foods:[{name:'Amla juice (100ml)',amount:'600 mg',kcal:45,ref:'Amla juice'},{name:'Guava (1 medium)',amount:'228 mg',kcal:37,ref:'Guava'},{name:'Bell pepper / Capsicum (½)',amount:'95 mg',kcal:16,ref:'Capsicum / Bell pepper'},{name:'Strawberries (1 cup)',amount:'85 mg',kcal:49,ref:'Strawberries'},{name:'Broccoli (1 cup)',amount:'81 mg',kcal:55,ref:'Broccoli'},{name:'Papaya (1 cup)',amount:'88 mg',kcal:55,ref:'Papaya'},{name:'Orange (1 medium)',amount:'70 mg',kcal:62,ref:'Orange'},{name:'Kiwi (1 medium)',amount:'64 mg',kcal:42,ref:'Kiwi'},{name:'Mango (1 cup)',amount:'60 mg',kcal:99,ref:'Mango'}]},
+  'folate':      {unit:'mcg',rdi:400,icon:'🥬',color:'#0F6E56',tip:'Folate is critical for DNA repair. Cooking destroys it — eat raw leafy greens. Avoid overcooking legumes. Important for hormonal health and energy.',foods:[{name:'Edamame (1 cup)',amount:'482 mcg',kcal:121,ref:'Edamame'},{name:'Lentils (1 cup)',amount:'358 mcg',kcal:230,ref:'Red lentils (cooked)'},{name:'Asparagus (5 spears)',amount:'134 mcg',kcal:20,ref:'Asparagus'},{name:'Beetroot (1 cup)',amount:'148 mcg',kcal:75,ref:'Beetroot'},{name:'Chickpeas (½ cup)',amount:'141 mcg',kcal:135,ref:'Chickpeas (cooked)'},{name:'Spinach, raw (2 cups)',amount:'116 mcg',kcal:14,ref:'Spinach (raw)'},{name:'Avocado (½)',amount:'82 mcg',kcal:80,ref:'Avocado'},{name:'Black beans (½ cup)',amount:'128 mcg',kcal:114,ref:'Black beans (cooked)'}]},
+  'vitamin a':   {unit:'mcg RAE',rdi:700,icon:'🥕',color:'#BA7517',tip:'Plant sources give beta-carotene (provitamin A). Eat with fat (avocado, oil) to improve conversion. Stress and thyroid issues reduce conversion from beta-carotene.',foods:[{name:'Sweet potato (1 medium)',amount:'961 mcg RAE',kcal:103,ref:'Sweet potato (baked)'},{name:'Carrot (1 medium)',amount:'509 mcg RAE',kcal:25,ref:'Carrot (raw)'},{name:'Pumpkin, cooked (1 cup)',amount:'706 mcg RAE',kcal:49,ref:'Pumpkin'},{name:'Spinach, cooked (1 cup)',amount:'573 mcg RAE',kcal:41,ref:'Spinach (raw)'},{name:'Kale (1 cup)',amount:'206 mcg RAE',kcal:33,ref:'Kale (raw)'},{name:'Mango (1 cup)',amount:'63 mcg RAE',kcal:99,ref:'Mango'},{name:'Papaya (1 cup)',amount:'77 mcg RAE',kcal:55,ref:'Papaya'}]},
+  'vitamin k':   {unit:'mcg',rdi:90,icon:'🥦',color:'#639922',tip:'Vitamin K1 from greens is important for bone health and blood clotting. If you take blood thinners (warfarin), keep intake consistent and consult your doctor.',foods:[{name:'Spinach, cooked (1 cup)',amount:'888 mcg',kcal:41,ref:'Spinach (raw)'},{name:'Kale (1 cup)',amount:'547 mcg',kcal:33,ref:'Kale (raw)'},{name:'Broccoli (1 cup)',amount:'220 mcg',kcal:55,ref:'Broccoli'},{name:'Brussels sprouts (1 cup)',amount:'219 mcg',kcal:56,ref:'Brussels sprouts'},{name:'Cabbage (1 cup)',amount:'68 mcg',kcal:22,ref:'Cabbage'},{name:'Edamame (1 cup)',amount:'41 mcg',kcal:121,ref:'Edamame'},{name:'Avocado (½)',amount:'21 mcg',kcal:80,ref:'Avocado'}]},
+  'fibre':       {unit:'g',rdi:25,icon:'🌾',color:'#639922',tip:'Increase fibre gradually to avoid bloating. Drink plenty of water. Soluble fibre (oats, beans) lowers cholesterol; insoluble fibre (vegetables) promotes gut movement.',foods:[{name:'Chia seeds (2 tbsp)',amount:'10g',kcal:138,ref:'Chia seeds'},{name:'Lentils (1 cup)',amount:'15.6g',kcal:230,ref:'Red lentils (cooked)'},{name:'Black beans (½ cup)',amount:'7.5g',kcal:114,ref:'Black beans (cooked)'},{name:'Edamame (1 cup)',amount:'8.0g',kcal:121,ref:'Edamame'},{name:'Pear (1 medium)',amount:'5.5g',kcal:101,ref:'Pear'},{name:'Quinoa (1 cup)',amount:'5.2g',kcal:222,ref:'Quinoa (cooked)'},{name:'Flaxseeds (2 tbsp)',amount:'3.8g',kcal:74,ref:'Flaxseeds (ground)'},{name:'Avocado (½)',amount:'4.6g',kcal:80,ref:'Avocado'},{name:'Oats ½ cup dry',amount:'4.0g',kcal:150,ref:'Oats (rolled, dry)'}]},
+  'protein':     {unit:'g',rdi:70,icon:'💪',color:'#0F6E56',tip:'Combine plant proteins throughout the day: legumes + grains (dal + rice). Soy (tofu, tempeh, edamame) is a complete protein on its own. Aim for 0.7g per lb body weight.',foods:[{name:'Seitan (100g)',amount:'25g',kcal:120,ref:'Seitan'},{name:'Tempeh (100g)',amount:'20g',kcal:195,ref:'Tempeh'},{name:'Edamame (1 cup)',amount:'18g',kcal:121,ref:'Edamame'},{name:'Lentils (1 cup)',amount:'18g',kcal:230,ref:'Red lentils (cooked)'},{name:'Tofu (100g)',amount:'17g',kcal:76,ref:'Tofu (firm)'},{name:'Hemp seeds (3 tbsp)',amount:'10g',kcal:166,ref:'Hemp seeds'},{name:'Nutritional yeast (2 tbsp)',amount:'8g',kcal:60,ref:'Nutritional yeast'},{name:'Quinoa (1 cup)',amount:'8g',kcal:222,ref:'Quinoa (cooked)'},{name:'Peanut butter (2 tbsp)',amount:'8g',kcal:188,ref:'Peanut butter'}]},
+  'selenium':    {unit:'mcg',rdi:55,icon:'🌰',color:'#639922',tip:'Just 1–2 Brazil nuts provides your entire daily selenium. Do not eat more than 4 per day — selenium toxicity is possible with regular high intake.',foods:[{name:'Brazil nuts (1–2 nuts)',amount:'68–91 mcg',kcal:35,ref:'Brazil nuts'},{name:'Sunflower seeds (28g)',amount:'23 mcg',kcal:164,ref:'Sunflower seeds'},{name:'Brown rice (1 cup)',amount:'19 mcg',kcal:216,ref:'Brown rice (cooked)'},{name:'Tofu (100g)',amount:'13 mcg',kcal:76,ref:'Tofu (firm)'},{name:'Oats ½ cup dry',amount:'13 mcg',kcal:150,ref:'Oats (rolled, dry)'}]},
+  'iodine':      {unit:'mcg',rdi:150,icon:'🌊',color:'#0F6E56',tip:'Iodine is the most overlooked vegan deficiency. Use iodised salt or take a 150mcg iodine supplement. Seaweed content is highly variable — not reliable as a sole source.',foods:[{name:'Iodised salt (½ tsp)',amount:'142 mcg',kcal:0,ref:null},{name:'Nori (2g)',amount:'16–116 mcg',kcal:5,ref:null},{name:'Fortified plant milk (240ml)',amount:'~55 mcg',kcal:120,ref:'Oat milk'},{name:'Iodine supplement (150mcg)',amount:'150 mcg',kcal:0,ref:null}]},
+  'phosphorus':  {unit:'mg',rdi:700,icon:'🔬',color:'#639922',tip:'Most vegans get adequate phosphorus from whole foods. Phytate in legumes reduces absorption, but soaking helps. Avoid excess phosphorus from processed foods.',foods:[{name:'Hemp seeds (3 tbsp)',amount:'495 mg',kcal:166,ref:'Hemp seeds'},{name:'Pumpkin seeds (28g)',amount:'333 mg',kcal:151,ref:'Pumpkin seeds'},{name:'Lentils (1 cup)',amount:'356 mg',kcal:230,ref:'Red lentils (cooked)'},{name:'Quinoa (1 cup)',amount:'281 mg',kcal:222,ref:'Quinoa (cooked)'},{name:'Tempeh (100g)',amount:'266 mg',kcal:195,ref:'Tempeh'},{name:'Oats ½ cup dry',amount:'180 mg',kcal:150,ref:'Oats (rolled, dry)'}]},
+};
+
+const ORACLE_ALIASES = {
+  'b12':'vitamin b12','vitamin b-12':'vitamin b12','cobalamin':'vitamin b12',
+  'vit d':'vitamin d','vitamin d3':'vitamin d','vit c':'vitamin c','ascorbic acid':'vitamin c',
+  'vit a':'vitamin a','retinol':'vitamin a','beta carotene':'vitamin a',
+  'vit k':'vitamin k','omega3':'omega-3','omega 3':'omega-3','dha':'omega-3','ala':'omega-3','epa':'omega-3',
+  'fiber':'fibre','dietary fiber':'fibre','folic acid':'folate',
+  'iron':'iron','calcium':'calcium','magnesium':'magnesium','zinc':'zinc','potassium':'potassium',
+  'protein':'protein','iodine':'iodine','selenium':'selenium',
+};
+
+function normaliseNutrient(q){
+  const l = q.toLowerCase().trim().replace(/[\u{1F300}-\u{1FFFF}\u2600-\u26FF]/gu,'').trim();
+  return ORACLE_ALIASES[l] || l;
+}
+
+function oracleInputChange(){
+  const q = document.getElementById('oracle-input')?.value.toLowerCase().trim() || '';
+  const chips = document.getElementById('oracle-chips');
+  if(!chips) return;
+  const matches = q
+    ? Object.keys(ORACLE_DB).filter(k=>k.includes(q)||q.includes(k.split(' ')[0]))
+    : Object.keys(ORACLE_DB);
+  chips.innerHTML = matches.slice(0,10).map(k=>`
+    <button onclick="triggerOracle('${k}')"
+      style="padding:4px 10px;border-radius:99px;border:1.5px solid var(--green-m);background:var(--green-l);color:var(--green);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+      ${ORACLE_DB[k].icon} ${k.charAt(0).toUpperCase()+k.slice(1)}</button>`).join('');
+}
+
+function runOracle(){
+  const q = document.getElementById('oracle-input')?.value || '';
+  if(!q.trim()){ showToast('Enter a nutrient name'); return; }
+  triggerOracle(q);
+}
+
+function triggerOracle(raw){
+  const key = normaliseNutrient(raw);
+  const data = ORACLE_DB[key];
+  showPage('nutrients');
+  const inp = document.getElementById('oracle-input');
+  if(inp) inp.value = key.charAt(0).toUpperCase()+key.slice(1);
+  const resultsEl = document.getElementById('oracle-results');
+  if(!resultsEl) return;
+  if(!data){
+    resultsEl.style.display='';
+    resultsEl.innerHTML=`<div class="card" style="border:1.5px solid var(--amber-m)"><div style="font-size:13px;color:var(--text2);text-align:center;padding:10px 0">No Oracle data for "<strong>${raw}</strong>".<br><span style="font-size:11px;color:var(--text3)">Try: Iron, B12, Vitamin D, Omega-3, Zinc, Calcium, Magnesium, Folate, Fibre, Protein</span></div></div>`;
+    return;
+  }
+  const nutrientKeyMap = {'vitamin b12':'vitB12','vitamin d':'vitD','vitamin c':'vitC','vitamin a':'vitA','vitamin k':'vitK','omega-3':'omega3','fibre':'fiber','iron':'iron','calcium':'calcium','zinc':'zinc','magnesium':'magnesium','potassium':'potassium','folate':'folate','phosphorus':'phosphorus','protein':null,'selenium':null,'iodine':null};
+  const pct = nutrientKeyMap[key] ? estimateNutrientPct(nutrientKeyMap[key]) : null;
+  const statusColor = !pct?'var(--text2)':pct<50?'var(--red)':pct<80?'var(--amber)':'var(--green)';
+  const statusLabel = !pct?'':pct<50?'⚠ Low today':pct<80?'📈 Moderate':'✅ Good today';
+
+  resultsEl.style.display='';
+  resultsEl.innerHTML=`
+    <div class="card" style="border:1.5px solid ${data.color}40">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="font-size:26px">${data.icon}</div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">${key.charAt(0).toUpperCase()+key.slice(1)}</div>
+          <div style="font-size:11px;color:var(--text2)">Target: ${data.rdi} ${data.unit}/day${statusLabel?' · <span style="color:'+statusColor+';font-weight:600">'+statusLabel+'</span>':''}</div>
+        </div>
+        <button onclick="document.getElementById('oracle-results').style.display='none'" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:20px;padding:4px">×</button>
+      </div>
+      <div style="background:var(--bg2);border-radius:var(--rs);padding:10px 12px;margin-bottom:14px;border-left:3px solid ${data.color}">
+        <div style="font-size:11px;font-weight:700;color:${data.color};margin-bottom:3px">💡 Oracle tip</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.5">${data.tip}</div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">Best vegan sources — tap Add to log now</div>
+      ${data.foods.map((f,i)=>`
+        <div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">
+          <div style="width:20px;height:20px;background:${data.color};border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span style="color:white;font-size:9px;font-weight:700">${i+1}</span>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${f.name}</div>
+            <div style="font-size:11px;color:var(--text3)">${f.amount} · ${f.kcal} kcal</div>
+          </div>
+          ${f.ref?`<button class="pill" onclick="addOracleFood('${f.ref.replace(/'/g,"&#39;")}')">Add</button>`:''}
+        </div>`).join('')}
+    </div>`;
+  setTimeout(()=>resultsEl.scrollIntoView({behavior:'smooth',block:'nearest'}),80);
+}
+
+function addOracleFood(foodName){
+  const food = LOCAL_FOODS.find(f=>f.name===foodName);
+  if(!food){ showToast('Search "'+foodName+'" to add it'); return; }
+  searchMealName = state.meals[0]?.label || 'Breakfast';
+  openConfirm({...food});
+}
+
+function initOracleChips(){
+  const chips = document.getElementById('oracle-chips');
+  if(!chips) return;
+  const keys = ['vitamin b12','iron','calcium','vitamin d','omega-3','zinc','magnesium','fibre','folate','vitamin c'];
+  chips.innerHTML = keys.map(k=>`
+    <button onclick="triggerOracle('${k}')"
+      style="padding:4px 10px;border-radius:99px;border:1.5px solid var(--green-m);background:var(--green-l);color:var(--green);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+      ${ORACLE_DB[k]?.icon||''} ${k.charAt(0).toUpperCase()+k.slice(1)}</button>`).join('');
+}
+
 function renderAll(){
   renderDiarySections();
   updateCalDisplay(); renderWater(); renderMeals(); renderNutrients();
@@ -3397,6 +3550,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     _wgRowEl.innerHTML = _lbl + (_savedTgt && _savedGoal!=='maintain' ? ' → '+_savedTgt+' lbs' : '') + ' <span style="color:var(--text3)">›</span>';
   }
   loadDateView(TODAY); // sets date label, banner, and calls renderAll()
+  initOracleChips();
   // Poller: safety net in case onAuthStateChanged fires before globals are ready
   let authPollCount = 0;
   const authPoller = setInterval(() => {
