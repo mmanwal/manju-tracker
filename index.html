@@ -1015,16 +1015,24 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 // ════════════════════════════════════════
 // CONSTANTS & STATE
 // ════════════════════════════════════════
-const TODAY = new Date().toISOString().slice(0,10);
+// Use local date (not UTC) to avoid midnight rollover in US timezones
+function localDateStr(date){
+  const d = date || new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+const TODAY = localDateStr();
 const HEIGHT_KEY = 'mnj_height';
 
 // ── DATE NAVIGATION ──────────────────────────────────
-let viewDate = TODAY;  // the date currently being viewed in the diary
+let viewDate = TODAY;
 
 function getDateOffset(days, fromDate){
-  const d = new Date(fromDate || viewDate);
+  const d = fromDate ? new Date(fromDate+'T12:00:00') : new Date(viewDate+'T12:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0,10);
+  return localDateStr(d);
 }
 
 function loadDateView(date){
@@ -1518,8 +1526,8 @@ function renderWeightCard(){
   if(!canvas) return;
 
   // Filter by range
-  const cutoff = new Date(TODAY); cutoff.setDate(cutoff.getDate() - wtChartRange);
-  const cutoffStr = cutoff.toISOString().slice(0,10);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - wtChartRange);
+  const cutoffStr = localDateStr(cutoff);
   const data = weightLog.filter(w => wtChartRange >= 9999 || w.date >= cutoffStr);
 
   // Stats row
@@ -1949,9 +1957,9 @@ function renderTrends(){
   // Week chart — last 7 days
   const wkVals = [];
   for(let i=6; i>=0; i--){
-    const d = new Date(TODAY+'T12:00:00');
+    const d = new Date();
     d.setDate(d.getDate()-i);
-    const ds = d.toISOString().slice(0,10);
+    const ds = localDateStr(d);
     wkVals.push({val: merged[ds]?.calories||0, isToday: i===0});
   }
   const wkMx = Math.max(...wkVals.map(v=>v.val), 1);
