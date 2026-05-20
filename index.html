@@ -1211,7 +1211,9 @@ const LOCAL_FOODS = [
   {name:'Coconut yogurt',unit:'100g',cal:80,p:1,c:8,f:5,cat:'all',src:'local',gPerUnit:100},
   {name:'Chia seeds',unit:'2 tbsp',cal:138,p:5,c:12,f:9,cat:'all',src:'local',gPerUnit:28},
   {name:'Flaxseeds (ground)',unit:'2 tbsp',cal:74,p:3,c:5,f:6,cat:'all',src:'local',gPerUnit:20},
-  {name:'Avocado',unit:'½ fruit',cal:80,p:1,c:4,f:7,cat:'all',src:'local',gPerUnit:75},
+  {name:'Avocado',unit:'½ fruit',cal:80,p:1,c:4,f:7,cat:'fruit',src:'local',gPerUnit:75,gPerPiece:150},
+  {name:'Avocado (whole)',unit:'1 fruit',cal:160,p:2,c:9,f:15,cat:'fruit',src:'local',gPerUnit:150},
+  {name:'Avocado (sliced)',unit:'100g',cal:160,p:2,c:9,f:15,cat:'fruit',src:'local',gPerUnit:100},
   {name:'Hummus',unit:'2 tbsp',cal:70,p:2,c:6,f:5,cat:'all',src:'local',gPerUnit:30},
   {name:'Dark chocolate 70%',unit:'30g',cal:170,p:2,c:13,f:12,cat:'all',src:'local',gPerUnit:30},
   {name:'Green tea',unit:'240ml',cal:0,p:0,c:0,f:0,cat:'all',src:'local',gPerUnit:240},
@@ -2022,6 +2024,28 @@ function renderTrends(){
 // ════════════════════════════════════════
 // API SEARCH
 // ════════════════════════════════════════
+// Common food name aliases and misspellings → canonical search term
+const FOOD_ALIASES = {
+  'avacado':'avocado', 'avacados':'avocado',
+  'brocolli':'broccoli', 'brocoli':'broccoli',
+  'bannana':'banana', 'bananna':'banana',
+  'blueberry':'blueberries', 'strawberry':'strawberries',
+  'blackberry':'blackberries', 'raspberry':'raspberries',
+  'chikpea':'chickpea', 'chick pea':'chickpea',
+  'tumeric':'turmeric', 'tumerick':'turmeric',
+  'spinich':'spinach', 'quinoa':'quinoa',
+  'edename':'edamame', 'edename':'edamame',
+  'pomegranet':'pomegranate', 'pomegranite':'pomegranate',
+  'walnut':'walnuts', 'almond':'almonds', 'peanut':'peanuts',
+  'tofu':'tofu', 'dhal':'dal', 'daal':'dal',
+  'roti':'roti', 'chapatti':'chapati',
+};
+
+function normaliseQuery(q){
+  const lower = q.toLowerCase().trim();
+  return FOOD_ALIASES[lower] || lower;
+}
+
 let freshOnly = false;
 function toggleFreshOnly(btn){
   freshOnly = !freshOnly;
@@ -2055,9 +2079,10 @@ async function doSearch(q){
   const sp=document.getElementById('search-spinner');
   sp.style.display='inline-block';
 
-  // Smart local match — handles singular/plural and partial
-  const qLower = q.toLowerCase().trim();
-  const qStem  = qLower.replace(/ies$/,'y').replace(/s$/,''); // berries→berry, strawberries→strawberry
+  // Normalise query — fix typos and aliases (avacado→avocado etc.)
+  const qNorm  = normaliseQuery(q);
+  const qLower = qNorm.toLowerCase().trim();
+  const qStem  = qLower.replace(/ies$/,'y').replace(/s$/,'');
   const local  = [...customFoods.map(f=>({...f,src:'local'})),...LOCAL_FOODS].filter(f=>{
     if(activeCat!=='all' && f.cat!==activeCat) return false;
     const n = f.name.toLowerCase();
@@ -2065,7 +2090,8 @@ async function doSearch(q){
     return n.includes(qLower) || n.includes(qStem) || nStem.includes(qStem) || qStem.includes(nStem);
   });
 
-  const [usda, offGlobal, offUS] = await Promise.all([searchUSDA(q), searchOFF(q), searchOFFUS(q)]);
+  // Use normalised term for API searches too
+  const [usda, offGlobal, offUS] = await Promise.all([searchUSDA(qNorm), searchOFF(qNorm), searchOFFUS(qNorm)]);
   sp.style.display='none';
 
   const combined = dedup([...local, ...usda, ...offUS, ...offGlobal]);
