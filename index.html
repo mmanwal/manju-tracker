@@ -335,6 +335,12 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 .fa-meal-btn{padding:10px 8px;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;color:var(--text2);text-align:center;transition:all .15s}
 .fa-meal-btn:active{background:var(--green-l);border-color:var(--green-m);color:var(--green)}
 .fa-meal-btn.current-meal{opacity:0.35;pointer-events:none}
+.section-reorder-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.section-move-btns{display:flex;gap:4px;opacity:0;transition:opacity .2s}
+.reorder-mode .section-move-btns{opacity:1}
+.section-move-btn{background:none;border:1.5px solid var(--border);border-radius:8px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:14px}
+.section-move-btn:disabled{opacity:0.25;pointer-events:none}
+.reorder-mode .card{border:1.5px dashed var(--green-m);transition:border .2s}
 .date-nav-btn{background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text2);font-size:20px;line-height:1;border-radius:6px}
 .date-nav-btn:active{background:var(--border)}
 .repeat-meal-btn{display:flex;align-items:center;gap:6px;width:100%;padding:9px 14px;color:var(--teal);font-size:12px;font-family:'DM Sans',sans-serif;background:var(--teal-l);border:none;border-top:1px solid var(--border);cursor:pointer;font-weight:500}
@@ -388,56 +394,16 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
         <button onclick="goToToday()" style="font-size:12px;font-weight:600;color:var(--amber);background:none;border:1.5px solid var(--amber-m);border-radius:99px;padding:4px 12px;cursor:pointer;font-family:'DM Sans',sans-serif">Go to today</button>
       </div>
 
-      <div class="sec">
-        <div class="card">
-          <div class="card-title">Today's calories</div>
-          <div class="ring-wrap">
-            <div class="ring-center">
-              <svg width="100" height="100" viewBox="0 0 100 100">
-                <circle class="ring-track" cx="50" cy="50" r="40"/>
-                <circle class="ring-prog" id="ring-c" cx="50" cy="50" r="40" stroke-dasharray="251.3" stroke-dashoffset="78"/>
-              </svg>
-              <div class="ring-text"><div class="ring-cal" id="cal-disp">1,240</div><div class="ring-lbl">kcal</div></div>
-            </div>
-            <div style="flex:1">
-              <div class="cal-stat"><span class="cs-lbl">Goal</span><span class="cs-val" id="goal-disp">1,800 kcal</span></div>
-              <div class="cal-stat"><span class="cs-lbl">Eaten</span><span class="cs-val" style="color:var(--green)" id="eaten-disp">1,240</span></div>
-              <div class="cal-stat"><span class="cs-lbl">Exercise</span><span class="cs-val" style="color:var(--teal)" id="ex-disp">+0</span></div>
-              <div class="cal-stat"><span class="cs-lbl">Remaining</span><span class="cs-val" style="color:var(--amber)" id="rem-disp">560</span></div>
-            </div>
-          </div>
-          <div class="macro-grid">
-            <div><div style="display:flex;justify-content:space-between"><span class="m-name">Protein</span><span class="m-num" style="color:var(--green)" id="pv">52g</span></div><div class="m-track"><div class="m-fill" id="pb" style="width:74%;background:var(--green-m)"></div></div><div class="m-sub" id="ps">/ 70g</div></div>
-            <div><div style="display:flex;justify-content:space-between"><span class="m-name">Carbs</span><span class="m-num" style="color:var(--amber)" id="cv">168g</span></div><div class="m-track"><div class="m-fill" id="cb" style="width:84%;background:var(--amber-m)"></div></div><div class="m-sub" id="cs">/ 200g</div></div>
-            <div><div style="display:flex;justify-content:space-between"><span class="m-name">Fat</span><span class="m-num" style="color:var(--teal)" id="fv">38g</span></div><div class="m-track"><div class="m-fill" id="fb" style="width:69%;background:var(--teal-m)"></div></div><div class="m-sub" id="fs">/ 55g</div></div>
-          </div>
-        </div>
+      <!-- Reorder toggle button -->
+      <div style="display:flex;justify-content:flex-end;padding:6px 16px 0">
+        <button id="reorder-toggle-btn" onclick="toggleReorderMode()"
+          style="font-size:12px;padding:4px 12px;border-radius:99px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .2s">
+          ⇅ Reorder
+        </button>
+      </div>
 
-        <div class="card">
-          <div class="card-title">Water intake</div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div><span style="font-size:22px;font-weight:600;color:var(--teal)" id="water-num">0</span><span style="font-size:13px;color:var(--text2)"> / 8 glasses</span></div>
-            <span class="tag t-tel" id="water-tag">On track 💧</span>
-          </div>
-          <div class="water-cups" id="water-cups"></div>
-        </div>
-
-        <!-- Body snapshot -->
-        <div class="card">
-          <div class="card-title">Body metrics</div>
-          <div class="metric-grid" id="body-snapshot">
-            <div class="metric-cell"><div class="metric-val" id="bm-weight">—</div><div class="metric-lbl">Weight (lbs)</div></div>
-            <div class="metric-cell"><div class="metric-val" id="bm-bf">—</div><div class="metric-lbl">Body fat %</div></div>
-            <div class="metric-cell"><div class="metric-val" id="bm-sleep">—</div><div class="metric-lbl">Sleep (hrs)</div></div>
-            <div class="metric-cell"><div class="metric-val" id="bm-bmi">—</div><div class="metric-lbl">BMI</div></div>
-          </div>
-          <button class="btn-secondary" onclick="openModal('metrics-modal')" style="margin-top:12px">Log metrics</button>
-        </div>
-
-        <div class="card" id="ex-diary-card" style="display:none">
-          <div class="card-title">Exercise today</div>
-          <div id="ex-diary-list"></div>
-        </div>
+      <div class="sec" id="diary-sections-container">
+        <!-- Sections rendered dynamically by renderDiarySections() -->
       </div>
       <div id="meals-container"></div>
     </div>
@@ -1612,7 +1578,9 @@ function renderWater(){
 // MEALS
 // ════════════════════════════════════════
 function renderMeals(){
-  const cont=document.getElementById('meals-container'); cont.innerHTML='';
+  // meals-container-inner is used when inside reordered sections; fallback to meals-container
+  const cont = document.getElementById('meals-container-inner') || document.getElementById('meals-container');
+  cont.innerHTML='';
   const isPast = viewDate !== TODAY;
 
   state.meals.forEach((meal,mi)=>{
@@ -3237,9 +3205,172 @@ document.querySelectorAll('.tabs .tab').forEach((btn,i)=>{
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
 
 // ════════════════════════════════════════
-// RENDER ALL
+// DIARY SECTION ORDER
 // ════════════════════════════════════════
+
+// Section definitions — id, title, and HTML generator
+const DIARY_SECTIONS = {
+  calories: {
+    id:'calories', title:'Today\'s calories', fixed:true,
+    html:()=>`
+      <div class="card" id="section-calories">
+        <div class="section-reorder-bar">
+          <div class="card-title" style="margin:0">Today's calories</div>
+          <div class="section-move-btns">
+            <button class="section-move-btn" onclick="moveSectionUp('calories')" title="Move up"><i class="ti ti-chevron-up"></i></button>
+            <button class="section-move-btn" onclick="moveSectionDown('calories')" title="Move down"><i class="ti ti-chevron-down"></i></button>
+          </div>
+        </div>
+        <div class="ring-wrap">
+          <div class="ring-center">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle class="ring-track" cx="50" cy="50" r="40"/>
+              <circle class="ring-prog" id="ring-c" cx="50" cy="50" r="40" stroke-dasharray="251.3" stroke-dashoffset="78"/>
+            </svg>
+            <div class="ring-text"><div class="ring-cal" id="cal-disp">0</div><div class="ring-lbl">kcal</div></div>
+          </div>
+          <div style="flex:1">
+            <div class="cal-stat"><span class="cs-lbl">Goal</span><span class="cs-val" id="goal-disp">${targets.cal.toLocaleString()} kcal</span></div>
+            <div class="cal-stat"><span class="cs-lbl">Eaten</span><span class="cs-val" style="color:var(--green)" id="eaten-disp">0</span></div>
+            <div class="cal-stat"><span class="cs-lbl">Exercise</span><span class="cs-val" style="color:var(--teal)" id="ex-disp">+0</span></div>
+            <div class="cal-stat"><span class="cs-lbl">Remaining</span><span class="cs-val" style="color:var(--amber)" id="rem-disp">${targets.cal.toLocaleString()}</span></div>
+          </div>
+        </div>
+        <div class="macro-grid">
+          <div><div style="display:flex;justify-content:space-between"><span class="m-name">Protein</span><span class="m-num" style="color:var(--green)" id="pv">0g</span></div><div class="m-track"><div class="m-fill" id="pb" style="width:0%;background:var(--green-m)"></div></div><div class="m-sub" id="ps">/ ${targets.p}g</div></div>
+          <div><div style="display:flex;justify-content:space-between"><span class="m-name">Carbs</span><span class="m-num" style="color:var(--amber)" id="cv">0g</span></div><div class="m-track"><div class="m-fill" id="cb" style="width:0%;background:var(--amber-m)"></div></div><div class="m-sub" id="cs">/ ${targets.c}g</div></div>
+          <div><div style="display:flex;justify-content:space-between"><span class="m-name">Fat</span><span class="m-num" style="color:var(--teal)" id="fv">0g</span></div><div class="m-track"><div class="m-fill" id="fb" style="width:0%;background:var(--teal-m)"></div></div><div class="m-sub" id="fs">/ ${targets.f}g</div></div>
+        </div>
+      </div>`
+  },
+  water: {
+    id:'water', title:'Water intake',
+    html:()=>`
+      <div class="card" id="section-water">
+        <div class="section-reorder-bar">
+          <div class="card-title" style="margin:0">Water intake</div>
+          <div class="section-move-btns">
+            <button class="section-move-btn" onclick="moveSectionUp('water')" title="Move up"><i class="ti ti-chevron-up"></i></button>
+            <button class="section-move-btn" onclick="moveSectionDown('water')" title="Move down"><i class="ti ti-chevron-down"></i></button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div><span style="font-size:22px;font-weight:600;color:var(--teal)" id="water-num">0</span><span style="font-size:13px;color:var(--text2)"> / 8 glasses</span></div>
+          <span class="tag t-tel" id="water-tag">On track 💧</span>
+        </div>
+        <div class="water-cups" id="water-cups"></div>
+      </div>`
+  },
+  metrics: {
+    id:'metrics', title:'Body metrics',
+    html:()=>`
+      <div class="card" id="section-metrics">
+        <div class="section-reorder-bar">
+          <div class="card-title" style="margin:0">Body metrics</div>
+          <div class="section-move-btns">
+            <button class="section-move-btn" onclick="moveSectionUp('metrics')" title="Move up"><i class="ti ti-chevron-up"></i></button>
+            <button class="section-move-btn" onclick="moveSectionDown('metrics')" title="Move down"><i class="ti ti-chevron-down"></i></button>
+          </div>
+        </div>
+        <div class="metric-grid" id="body-snapshot">
+          <div class="metric-cell"><div class="metric-val" id="bm-weight">—</div><div class="metric-lbl">Weight (lbs)</div></div>
+          <div class="metric-cell"><div class="metric-val" id="bm-bf">—</div><div class="metric-lbl">Body fat %</div></div>
+          <div class="metric-cell"><div class="metric-val" id="bm-sleep">—</div><div class="metric-lbl">Sleep (hrs)</div></div>
+          <div class="metric-cell"><div class="metric-val" id="bm-bmi">—</div><div class="metric-lbl">BMI</div></div>
+        </div>
+        <button class="btn-secondary" onclick="openModal('metrics-modal')" style="margin-top:12px">Log metrics</button>
+      </div>`
+  },
+  exercise: {
+    id:'exercise', title:'Exercise',
+    html:()=>`
+      <div class="card" id="ex-diary-card" style="display:none">
+        <div class="section-reorder-bar">
+          <div class="card-title" style="margin:0">Exercise today</div>
+          <div class="section-move-btns">
+            <button class="section-move-btn" onclick="moveSectionUp('exercise')" title="Move up"><i class="ti ti-chevron-up"></i></button>
+            <button class="section-move-btn" onclick="moveSectionDown('exercise')" title="Move down"><i class="ti ti-chevron-down"></i></button>
+          </div>
+        </div>
+        <div id="ex-diary-list"></div>
+      </div>`
+  },
+  meals: {
+    id:'meals', title:'Meals',
+    html:()=>`<div id="meals-container-inner"></div>`
+  }
+};
+
+const DEFAULT_SECTION_ORDER = ['calories','water','metrics','exercise','meals'];
+let sectionOrder = ls('mnj_section_order', DEFAULT_SECTION_ORDER);
+// Ensure all sections present (in case new ones added)
+DEFAULT_SECTION_ORDER.forEach(id=>{ if(!sectionOrder.includes(id)) sectionOrder.push(id); });
+
+let reorderMode = false;
+
+function renderDiarySections(){
+  const cont = document.getElementById('diary-sections-container');
+  if(!cont) return;
+  cont.innerHTML = sectionOrder.map(id => DIARY_SECTIONS[id]?.html() || '').join('');
+  // Move meals-container-inner into the right place
+  const inner = document.getElementById('meals-container-inner');
+  const mc    = document.getElementById('meals-container');
+  if(inner && mc){
+    inner.appendChild(mc);
+  }
+  // Apply reorder mode styling
+  if(reorderMode) cont.classList.add('reorder-mode');
+  else cont.classList.remove('reorder-mode');
+  // Update ↑↓ button disabled state
+  sectionOrder.forEach((id,i)=>{
+    const card = document.getElementById('section-'+id) || document.getElementById('section-'+id.replace('exercise','ex-diary-card'));
+    if(!card) return;
+    const ups   = card.querySelectorAll('[onclick^="moveSectionUp"]');
+    const downs = card.querySelectorAll('[onclick^="moveSectionDown"]');
+    ups.forEach(b   => b.disabled = (i===0));
+    downs.forEach(b => b.disabled = (i===sectionOrder.length-1));
+  });
+}
+
+function moveSectionUp(id){
+  const i = sectionOrder.indexOf(id);
+  if(i <= 0) return;
+  [sectionOrder[i-1], sectionOrder[i]] = [sectionOrder[i], sectionOrder[i-1]];
+  lsSet('mnj_section_order', sectionOrder);
+  renderDiarySections();
+  renderAll();
+  showToast('Moved up ✓');
+}
+
+function moveSectionDown(id){
+  const i = sectionOrder.indexOf(id);
+  if(i < 0 || i >= sectionOrder.length-1) return;
+  [sectionOrder[i], sectionOrder[i+1]] = [sectionOrder[i+1], sectionOrder[i]];
+  lsSet('mnj_section_order', sectionOrder);
+  renderDiarySections();
+  renderAll();
+  showToast('Moved down ✓');
+}
+
+function toggleReorderMode(){
+  reorderMode = !reorderMode;
+  const btn = document.getElementById('reorder-toggle-btn');
+  const cont = document.getElementById('diary-sections-container');
+  if(btn){
+    btn.textContent = reorderMode ? '✓ Done' : '⇅ Reorder';
+    btn.style.background    = reorderMode ? 'var(--green)'   : '';
+    btn.style.color         = reorderMode ? 'white'          : '';
+    btn.style.borderColor   = reorderMode ? 'var(--green)'   : '';
+  }
+  if(cont) reorderMode ? cont.classList.add('reorder-mode') : cont.classList.remove('reorder-mode');
+  // Show/hide move buttons via CSS
+  document.querySelectorAll('.section-move-btns').forEach(el=>{
+    el.style.opacity = reorderMode ? '1' : '0';
+    el.style.pointerEvents = reorderMode ? 'auto' : 'none';
+  });
+}
 function renderAll(){
+  renderDiarySections();
   updateCalDisplay(); renderWater(); renderMeals(); renderNutrients();
   renderBodyMetrics(); renderWeightCard(); renderExercise(); renderRecipes(); renderTrends();
   renderVitaminLog();
