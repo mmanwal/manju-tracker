@@ -1180,9 +1180,19 @@ const LOCAL_FOODS = [
   {name:'Oats (rolled, dry)',unit:'½ cup',cal:150,p:5,c:27,f:4,cat:'grain',src:'local',gPerUnit:40},
   {name:'Millet (cooked)',unit:'1 cup',cal:207,p:6,c:41,f:2,cat:'grain',src:'local',gPerUnit:175},
   {name:'Whole wheat bread',unit:'1 slice',cal:69,p:4,c:12,f:2,cat:'grain',src:'local',gPerUnit:28},
-  {name:'Banana',unit:'1 medium',cal:89,p:1,c:23,f:0,cat:'fruit',src:'local',gPerUnit:118},
-  {name:'Mango',unit:'1 cup sliced',cal:99,p:1,c:25,f:0,cat:'fruit',src:'local',gPerUnit:165},
-  {name:'Apple',unit:'1 medium',cal:95,p:0,c:25,f:1,cat:'fruit',src:'local',gPerUnit:182},
+  {name:'Strawberries',unit:'100g',cal:32,p:0.7,c:7.7,f:0.3,cat:'fruit',src:'local',gPerUnit:100,gPerPiece:12},
+  {name:'Blueberries',unit:'100g',cal:57,p:0.7,c:14,f:0.3,cat:'fruit',src:'local',gPerUnit:100,gPerPiece:2},
+  {name:'Blackberries',unit:'100g',cal:43,p:1.4,c:10,f:0.5,cat:'fruit',src:'local',gPerUnit:100,gPerPiece:8},
+  {name:'Raspberries',unit:'100g',cal:52,p:1.2,c:12,f:0.7,cat:'fruit',src:'local',gPerUnit:100,gPerPiece:4},
+  {name:'Grapes',unit:'100g',cal:69,p:0.7,c:18,f:0.2,cat:'fruit',src:'local',gPerUnit:100,gPerPiece:5},
+  {name:'Cherries',unit:'100g',cal:63,p:1.1,c:16,f:0.2,cat:'fruit',src:'local',gPerUnit:100,gPerPiece:8},
+  {name:'Peanuts',unit:'28g',cal:161,p:7,c:5,f:14,cat:'protein',src:'local',gPerUnit:28,gPerPiece:0.7},
+  {name:'Cashews',unit:'28g',cal:157,p:5,c:9,f:12,cat:'protein',src:'local',gPerUnit:28,gPerPiece:1.5},
+  {name:'Pistachios',unit:'28g',cal:159,p:6,c:8,f:13,cat:'protein',src:'local',gPerUnit:28,gPerPiece:0.7},
+  {name:'Pecans',unit:'28g',cal:196,p:3,c:4,f:20,cat:'protein',src:'local',gPerUnit:28,gPerPiece:1.9},
+  {name:'Banana',unit:'1 medium',cal:89,p:1,c:23,f:0,cat:'fruit',src:'local',gPerUnit:118,gPerPiece:118},
+  {name:'Apple',unit:'1 medium',cal:95,p:0,c:25,f:1,cat:'fruit',src:'local',gPerUnit:182,gPerPiece:182},
+  {name:'Orange',unit:'1 medium',cal:62,p:1,c:15,f:0,cat:'fruit',src:'local',gPerUnit:131,gPerPiece:131},
   {name:'Guava',unit:'1 medium',cal:37,p:1,c:8,f:0,cat:'fruit',src:'local',gPerUnit:55},
   {name:'Papaya',unit:'1 cup',cal:55,p:1,c:14,f:0,cat:'fruit',src:'local',gPerUnit:145},
   {name:'Pomegranate seeds',unit:'½ cup',cal:72,p:1,c:16,f:0,cat:'fruit',src:'local',gPerUnit:87},
@@ -2228,54 +2238,103 @@ async function lookupBarcode(){
 // ════════════════════════════════════════
 
 // Standard unit gram-equivalents
-const UNIT_GRAMS = {
-  'g':      1,
-  'oz':     28.35,
-  'tsp':    4.2,
-  'tbsp':   14.2,
-  'cup':    240,
-  '½ cup':  120,
-  '¼ cup':  60,
-  'ml':     1,       // ml ≈ g for water-based foods
-  'piece':  null,    // no gram equiv — use food's own serving
-  'serving':null,
+// Per-piece gram weights for common countable foods
+const PIECE_WEIGHTS = {
+  'strawberry':12, 'strawberries':12,
+  'blueberry':2,   'blueberries':2,
+  'blackberry':8,  'blackberries':8,
+  'raspberry':4,   'raspberries':4,
+  'grape':5,       'grapes':5,
+  'cherry':8,      'cherries':8,
+  'cranberry':1.5, 'cranberries':1.5,
+  'peanut':0.7,    'peanuts':0.7,
+  'almond':1.2,    'almonds':1.2,
+  'walnut':3.5,    'walnuts':3.5,   // per half
+  'cashew':1.5,    'cashews':1.5,
+  'pistachio':0.7, 'pistachios':0.7,
+  'pecan':1.9,     'pecans':1.9,
+  'date':24,       'dates':24,
+  'olive':4,       'olives':4,
+  'cherry tomato':17, 'cherry tomatoes':17,
+  'grape tomato':14,
+  'raisin':0.9,    'raisin':0.9,
+  'idli':40,
+  'roti':35,       'chapati':40,
+  'biscuit':10,    'cookie':16,
+  'egg':50,
 };
 
-function buildUnitOptions(food){
-  // Determine the food's base unit gram weight
-  // Parse unit string like "100g", "28g", "1 cup", "2 tbsp", "1 oz"
-  const unitStr = (food.unit||'').toLowerCase().trim();
-  let baseG = null; // grams per 1× of food's base unit
-
-  // Try to extract grams from unit string directly
-  const gMatch = unitStr.match(/^([\d.]+)\s*g$/);
-  const ozMatch = unitStr.match(/^([\d.]+)\s*oz$/);
-  const cupMatch = unitStr.match(/^([\d./]+)\s*cup/);
-  const tbspMatch = unitStr.match(/^([\d.]+)\s*tbsp/);
-  const tspMatch = unitStr.match(/^([\d.]+)\s*tsp/);
-  const mlMatch = unitStr.match(/^([\d.]+)\s*ml/);
-  const piecesMatch = unitStr.match(/^([\d.]+)\s*(piece|pc|roti|chapati|idli|dosa|egg)/);
-
-  if(gMatch)      baseG = parseFloat(gMatch[1]);
-  else if(ozMatch) baseG = parseFloat(ozMatch[1]) * 28.35;
-  else if(cupMatch){
-    const v = cupMatch[1].includes('/') ? eval(cupMatch[1]) : parseFloat(cupMatch[1]);
-    baseG = v * 240;
+function getPieceWeight(foodName){
+  const n = (foodName||'').toLowerCase();
+  for(const [key, grams] of Object.entries(PIECE_WEIGHTS)){
+    if(n.includes(key)) return grams;
   }
+  return null;
+}
+
+function buildUnitOptions(food){
+  const unitStr = (food.unit||'').toLowerCase().trim();
+  let baseG = null;
+
+  const gMatch    = unitStr.match(/^([\d.]+)\s*g$/);
+  const ozMatch   = unitStr.match(/^([\d.]+)\s*oz$/);
+  const cupMatch  = unitStr.match(/^([\d./]+)\s*cup/);
+  const tbspMatch = unitStr.match(/^([\d.]+)\s*tbsp/);
+  const tspMatch  = unitStr.match(/^([\d.]+)\s*tsp/);
+  const mlMatch   = unitStr.match(/^([\d.]+)\s*ml/);
+
+  if(gMatch)       baseG = parseFloat(gMatch[1]);
+  else if(ozMatch) baseG = parseFloat(ozMatch[1]) * 28.35;
+  else if(cupMatch){ const v=cupMatch[1].includes('/')?eval(cupMatch[1]):parseFloat(cupMatch[1]); baseG=v*240; }
   else if(tbspMatch) baseG = parseFloat(tbspMatch[1]) * 14.2;
   else if(tspMatch)  baseG = parseFloat(tspMatch[1]) * 4.2;
   else if(mlMatch)   baseG = parseFloat(mlMatch[1]);
-  else if(piecesMatch) baseG = null; // count-based, no gram equiv
-  // food.gPerUnit overrides all (set on local foods)
+
+  // food.gPerUnit overrides parsed value
   if(food.gPerUnit) baseG = food.gPerUnit;
+  if(baseG) food._baseG = baseG;
 
-  // Build option list — always include the food's own unit first
+  // Detect piece weight — from food's own gPerPiece, PIECE_WEIGHTS lookup, or unit string
+  let pieceG = food.gPerPiece || getPieceWeight(food.name) || null;
+  // Also parse "1 medium", "2 dates", "3 pieces" style units
+  const pcMatch = unitStr.match(/^([\d.]+)\s*(medium|large|small|piece|pc|fruit|berry|berries)s?/);
+  if(pcMatch && baseG) pieceG = baseG / parseFloat(pcMatch[1]);
+
   const opts = [];
-
-  // The food's native unit is always option 0 (multiplier = 1)
+  // Native unit always first
   opts.push({label: food.unit, mult: 1, isNative: true});
 
-  // Add convertible units only if we know the base gram weight
+  // Piece/count unit — most natural for berries, nuts, fruits
+  if(pieceG && pieceG > 0){
+    const foodNameLower = food.name.toLowerCase();
+    // Pick the right singular label
+    let pieceLabel = 'piece';
+    if(foodNameLower.includes('strawberr')) pieceLabel = 'strawberry';
+    else if(foodNameLower.includes('blueberr')) pieceLabel = 'blueberry';
+    else if(foodNameLower.includes('blackberr')) pieceLabel = 'blackberry';
+    else if(foodNameLower.includes('raspberr')) pieceLabel = 'raspberry';
+    else if(foodNameLower.includes('grape') && !foodNameLower.includes('grapefruit')) pieceLabel = 'grape';
+    else if(foodNameLower.includes('cherr')) pieceLabel = 'cherry';
+    else if(foodNameLower.includes('cranberr')) pieceLabel = 'cranberry';
+    else if(foodNameLower.includes('peanut')) pieceLabel = 'peanut';
+    else if(foodNameLower.includes('almond')) pieceLabel = 'almond';
+    else if(foodNameLower.includes('walnut')) pieceLabel = 'walnut half';
+    else if(foodNameLower.includes('cashew')) pieceLabel = 'cashew';
+    else if(foodNameLower.includes('pistachio')) pieceLabel = 'pistachio';
+    else if(foodNameLower.includes('pecan')) pieceLabel = 'pecan half';
+    else if(foodNameLower.includes('date')) pieceLabel = 'date';
+    else if(foodNameLower.includes('olive')) pieceLabel = 'olive';
+    else if(foodNameLower.includes('raisin')) pieceLabel = 'raisin';
+
+    if(baseG){
+      const mult = pieceG / baseG;
+      if(!opts.some(o=>o.label===pieceLabel)){
+        opts.splice(1, 0, {label: pieceLabel, mult, isNative:false, isPiece:true, pieceG});
+      }
+    }
+  }
+
+  // Standard weight/volume conversions (only if we know baseG)
   if(baseG && baseG > 0){
     const conversions = [
       {label:'g',     grams:1},
@@ -2286,14 +2345,10 @@ function buildUnitOptions(food){
       {label:'½ cup', grams:120},
     ];
     conversions.forEach(u=>{
-      // Don't duplicate the native unit if it already matches
-      const alreadyThere = opts.some(o=>o.label===u.label);
-      if(!alreadyThere){
-        opts.push({label:u.label, mult: u.grams / baseG, isNative:false});
+      if(!opts.some(o=>o.label===u.label)){
+        opts.push({label:u.label, mult: u.grams/baseG, isNative:false});
       }
     });
-    // Store baseG on food for use in updateConfirmNutrition
-    food._baseG = baseG;
   }
 
   return opts;
@@ -2307,17 +2362,25 @@ function openConfirm(food){
   document.getElementById('confirm-meal').textContent = searchMealName;
   document.getElementById('confirm-qty').value = 1;
 
-  // Populate unit dropdown
+  // Populate unit dropdown — auto-select piece unit if available
   const sel = document.getElementById('confirm-unit-sel');
   sel.innerHTML = pendingUnitOpts.map((u,i)=>
     `<option value="${i}">${u.label}</option>`
   ).join('');
-  sel.value = 0;
+  // Default to piece unit if it exists (most natural for berries/nuts)
+  const pieceIdx = pendingUnitOpts.findIndex(o=>o.isPiece);
+  sel.value = pieceIdx >= 0 ? pieceIdx : 0;
 
   // Show base serving note
   const baseNote = document.getElementById('confirm-base-unit');
-  if(food._baseG) baseNote.textContent = `Base: ${food.unit} ≈ ${Math.round(food._baseG)}g`;
-  else baseNote.textContent = `Base: ${food.unit}`;
+  const pieceOpt = pendingUnitOpts.find(o=>o.isPiece);
+  if(pieceOpt){
+    baseNote.textContent = `1 ${pieceOpt.label} ≈ ${Math.round(pieceOpt.pieceG)}g · ${Math.round(food.cal * pieceOpt.mult)} kcal each`;
+  } else if(food._baseG){
+    baseNote.textContent = `Base: ${food.unit} ≈ ${Math.round(food._baseG)}g`;
+  } else {
+    baseNote.textContent = `Base: ${food.unit}`;
+  }
 
   updateConfirmNutrition();
   openModal('add-confirm-modal');
