@@ -516,8 +516,11 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
             <input type="text" placeholder="Search millions of foods..." id="search-input" oninput="onSearchInput()" autocomplete="off">
             <div class="spinner" id="search-spinner" style="display:none"></div>
           </div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:10px">
-            <span class="src-usda">USDA</span> ingredients · <span class="src-off">Open Food Facts</span> 3M+ global &amp; US brands (Kirkland, Nordic Naturals, Amy's…) · <span class="src-local">Built-in</span> Indian vegan
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+            <div style="font-size:11px;color:var(--text3)">
+              <span class="src-usda">USDA</span> · <span class="src-off">Open Food Facts</span> · <span class="src-local">Built-in</span>
+            </div>
+            <button id="fresh-only-btn" onclick="toggleFreshOnly(this)" style="font-size:11px;padding:3px 10px;border-radius:99px;border:1.5px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif">🥦 Fresh only</button>
           </div>
           <div id="search-results"></div>
         </div>
@@ -2019,6 +2022,28 @@ function renderTrends(){
 // ════════════════════════════════════════
 // API SEARCH
 // ════════════════════════════════════════
+let freshOnly = false;
+function toggleFreshOnly(btn){
+  freshOnly = !freshOnly;
+  btn.style.background    = freshOnly ? 'var(--green-l)' : 'var(--bg)';
+  btn.style.color         = freshOnly ? 'var(--green)'   : 'var(--text2)';
+  btn.style.borderColor   = freshOnly ? 'var(--green-m)' : 'var(--border)';
+  btn.style.fontWeight    = freshOnly ? '600' : '';
+  // Re-run current search
+  const q = document.getElementById('search-input').value.trim();
+  if(q) doSearch(q); else renderLocalFoods(activeCat);
+}
+
+// Keywords that suggest a processed/packaged product — filter these out in fresh-only mode
+const PROCESSED_KEYWORDS = ['jam','jelly','juice','drink','syrup','yogurt','kefir','milk','cream','butter','spread','conserve','preserve','confiture','powder','supplement','protein bar','granola bar','cookie','biscuit','cake','pie','sauce','vinegar','extract','flavour','flavor','concentrate'];
+
+function isFreshFood(food){
+  const n = food.name.toLowerCase();
+  if(food.src === 'local') return true; // built-in foods are always fresh
+  if(food.brand) return false;          // branded = packaged = not fresh
+  return !PROCESSED_KEYWORDS.some(k => n.includes(k));
+}
+
 let searchTimer=null;
 function onSearchInput(){
   clearTimeout(searchTimer);
@@ -2029,14 +2054,33 @@ function onSearchInput(){
 async function doSearch(q){
   const sp=document.getElementById('search-spinner');
   sp.style.display='inline-block';
-  const local=[...customFoods.map(f=>({...f,src:'local'})),...LOCAL_FOODS]
-    .filter(f=>f.name.toLowerCase().includes(q.toLowerCase())&&(activeCat==='all'||f.cat===activeCat));
+
+  // Smart local match — handles singular/plural and partial
+  const qLower = q.toLowerCase().trim();
+  const qStem  = qLower.replace(/ies$/,'y').replace(/s$/,''); // berries→berry, strawberries→strawberry
+  const local  = [...customFoods.map(f=>({...f,src:'local'})),...LOCAL_FOODS].filter(f=>{
+    if(activeCat!=='all' && f.cat!==activeCat) return false;
+    const n = f.name.toLowerCase();
+    const nStem = n.replace(/ies$/,'y').replace(/s$/,'');
+    return n.includes(qLower) || n.includes(qStem) || nStem.includes(qStem) || qStem.includes(nStem);
+  });
+
   const [usda, offGlobal, offUS] = await Promise.all([searchUSDA(q), searchOFF(q), searchOFFUS(q)]);
   sp.style.display='none';
+
   const combined = dedup([...local, ...usda, ...offUS, ...offGlobal]);
   combined.sort((a,b)=>{
-    if(a.src==='local'&&b.src!=='local') return -1;
-    if(b.src==='local'&&a.src!=='local') return  1;
+    // Built-in local always first
+    if(a.src==='local' && b.src!=='local') return -1;
+    if(b.src==='local' && a.src!=='local') return  1;
+    // Prefer names that START with the query (fresh strawberry > strawberry jam)
+    const aName = a.name.toLowerCase();
+    const bName = b.name.toLowerCase();
+    const aStarts = aName.startsWith(qLower) || aName.startsWith(qStem);
+    const bStarts = bName.startsWith(qLower) || bName.startsWith(qStem);
+    if(aStarts && !bStarts) return -1;
+    if(bStarts && !aStarts) return  1;
+    // Shorter names = less processed (strawberry < strawberry jam preserve)
     return a.name.length - b.name.length;
   });
   renderResults(combined);
@@ -2052,14 +2096,20 @@ function dedup(arr){
 }
 function renderLocalFoods(cat){
   const list=[...customFoods.map(f=>({...f,src:'local'})),...LOCAL_FOODS].filter(f=>cat==='all'||f.cat===cat);
+  // Sort: fruits alphabetically, berries first within fruit category
   renderResults(list);
 }
 function renderResults(list){
   const el=document.getElementById('search-results');
-  if(!list.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No foods found — try different keywords or check spelling</div>';return;}
+  // Apply fresh-only filter if active
+  const filtered = freshOnly ? list.filter(isFreshFood) : list;
+  if(!filtered.length){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No foods found'+(freshOnly?' — try turning off 🥦 Fresh only':' — try different keywords')+'</div>';
+    return;
+  }
   const srcLabel={usda:'USDA',off:'Open Food Facts',local:'Built-in'};
   const srcClass={usda:'src-usda',off:'src-off',local:'src-local'};
-  el.innerHTML=list.slice(0,200).map(f=>{
+  el.innerHTML=filtered.slice(0,200).map(f=>{
     const src=f.src||'local';
     const badge=`<span class="${srcClass[src]||'src-local'}">${srcLabel[src]||src}</span>`;
     const brand=f.brand?`<span style="color:var(--text3);font-size:11px"> · ${f.brand}</span>`:'';
@@ -2073,7 +2123,7 @@ function renderResults(list){
         <button class="pill" onclick='openConfirm(${JSON.stringify(f).replace(/'/g,"&#39;")})'>Add</button>
       </div>
     </div>`;
-  }).join('')+(list.length>0?`<div style="text-align:center;padding:10px;font-size:11px;color:var(--text3)">${list.length} results</div>`:'');
+  }).join('')+(filtered.length>0?`<div style="text-align:center;padding:10px;font-size:11px;color:var(--text3)">${filtered.length} results${freshOnly?' (fresh only)':''}</div>`:'');
 }
 function setCat(cat,btn){
   activeCat=cat;
